@@ -1,0 +1,215 @@
+@import "tailwindcss";
+@import "./styles/fonts.css";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-bg-base: var(--bg-base);
+  --color-bg-panel: var(--bg-panel);
+  --color-bg-raised: var(--bg-raised);
+  --color-bg-overlay: var(--bg-overlay);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-line: var(--accent-line);
+  --color-cyan: var(--cyan);
+  --color-green: var(--green);
+  --color-blue: var(--blue);
+  --color-amber: var(--amber);
+  --color-red: var(--red);
+  --color-violet: var(--violet);
+  --color-neutral: var(--neutral);
+  --radius-ui-control: var(--radius-control);
+  --radius-ui-panel: var(--radius-panel);
+  --radius-ui-section: var(--radius-section);
+}
+
+@keyframes loaderAnim {
+  0% {
+    inset: 0 35px 35px 0;
+  }
+
+  12.5% {
+    inset: 0 35px 0 0;
+  }
+
+  25% {
+    inset: 35px 35px 0 0;
+  }
+
+  37.5% {
+    inset: 35px 0 0 0;
+  }
+
+  50% {
+    inset: 35px 0 0 35px;
+  }
+
+  62.5% {
+    inset: 0 0 0 35px;
+  }
+
+  75% {
+    inset: 0 0 35px 35px;
+  }
+
+  87.5% {
+    inset: 0 0 35px 0;
+  }
+
+  100% {
+    inset: 0 35px 35px 0;
+  }
+}
+
+.animate-loaderAnim {
+  animation: loaderAnim 2.5s infinite;
+}
+
+.animation-delay {
+  animation-delay: -1.25s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-loaderAnim {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+  }
+}
+
+@layer base {
+  :root {
+    --bg-base: oklch(13% 0.036 286);
+    --bg-panel: oklch(17% 0.038 286 / 0.88);
+    --bg-raised: oklch(21% 0.042 286 / 0.82);
+    --bg-overlay: oklch(9% 0.03 286 / 0.72);
+    --line: oklch(82% 0.06 286 / 0.14);
+    --line-strong: oklch(82% 0.08 286 / 0.28);
+    --text-primary: oklch(94% 0.01 286);
+    --text-secondary: oklch(76% 0.025 286);
+    --text-muted: oklch(60% 0.026 286);
+    --accent: oklch(68% 0.19 302);
+    --accent-soft: oklch(68% 0.19 302 / 0.14);
+    --accent-line: oklch(68% 0.19 302 / 0.32);
+    --cyan: oklch(77% 0.14 191);
+    --green: oklch(76% 0.17 151);
+    --blue: oklch(72% 0.15 242);
+    --amber: oklch(78% 0.16 74);
+    --red: oklch(69% 0.18 28);
+    --violet: oklch(72% 0.18 302);
+    --neutral: oklch(75% 0.025 286);
+    --scrollbar-track: oklch(100% 0 0 / 0.045);
+    --scrollbar-thumb: oklch(77% 0.14 191 / 0.5);
+    --scrollbar-thumb-strong: oklch(68% 0.19 302 / 0.72);
+    --shadow:
+      0 12px 30px rgb(0 0 0 / 0.28), inset 0 1px 0 rgb(255 255 255 / 0.05);
+    --radius-control: 10px;
+    --radius-panel: 16px;
+    --radius-section: 22px;
+    --control-height: 42px;
+  }
+
+  * {
+    box-sizing: border-box;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-track {
+    border-radius: 999px;
+    background: var(--scrollbar-track);
+    box-shadow: inset 0 0 0 1px oklch(100% 0 0 / 0.035);
+  }
+
+  *::-webkit-scrollbar-thumb {
+    min-height: 44px;
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: linear-gradient(
+        180deg,
+        var(--scrollbar-thumb),
+        var(--scrollbar-thumb-strong)
+      )
+      padding-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(
+        180deg,
+        color-mix(in oklch, var(--cyan) 84%, white 10%),
+        color-mix(in oklch, var(--accent) 88%, white 8%)
+      )
+      padding-box;
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  html,
+  body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  input,
+  select,
+  textarea {
+    color-scheme: dark;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.52;
+  }
+
+  ::selection {
+    background: var(--accent-soft);
+    color: var(--text-primary);
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.12;
+    background-image: radial-gradient(
+      rgb(255 255 255 / 0.12) 0.6px,
+      transparent 0.6px
+    );
+    background-size: 18px 18px;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--cyan);
+    outline-offset: 3px;
+  }
+}

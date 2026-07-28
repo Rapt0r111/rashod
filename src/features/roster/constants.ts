@@ -1,0 +1,124 @@
+import type { LocationOption, Platoon } from "./types";
+
+export const SYSTEM_LOCATIONS: LocationOption[] = [
+  {
+    id: "loc-rota",
+    key: "rota",
+    label: "Рота",
+    colorToken: "green",
+    isQuick: true,
+    quickCode: "Р",
+    isSystem: true,
+    sortOrder: 10,
+  },
+  {
+    id: "loc-technopark",
+    key: "technopark",
+    label: "Технопарк",
+    colorToken: "blue",
+    isQuick: true,
+    quickCode: "Т",
+    isSystem: true,
+    sortOrder: 20,
+  },
+  {
+    id: "loc-stolovaya",
+    key: "stolovaya",
+    label: "Столовая",
+    colorToken: "amber",
+    isQuick: true,
+    quickCode: "С",
+    isSystem: true,
+    sortOrder: 30,
+  },
+  {
+    id: "loc-naryad",
+    key: "naryad",
+    label: "Наряд",
+    colorToken: "cyan",
+    isQuick: true,
+    quickCode: "Н",
+    isSystem: true,
+    sortOrder: 40,
+  },
+  {
+    id: "loc-sanchast",
+    key: "sanchast",
+    label: "Санчасть",
+    colorToken: "red",
+    isQuick: false,
+    quickCode: null,
+    isSystem: true,
+    sortOrder: 50,
+  },
+  {
+    id: "loc-uvolnenie",
+    key: "uvolnenie",
+    label: "Увольнение",
+    colorToken: "violet",
+    isQuick: false,
+    quickCode: null,
+    isSystem: true,
+    sortOrder: 60,
+  },
+  {
+    id: "loc-komandirovka",
+    key: "komandirovka",
+    label: "Командировка",
+    colorToken: "neutral",
+    isQuick: false,
+    quickCode: null,
+    isSystem: true,
+    sortOrder: 70,
+  },
+  {
+    id: "loc-otpusk",
+    key: "otpusk",
+    label: "Отпуск",
+    colorToken: "neutral",
+    isQuick: false,
+    quickCode: null,
+    isSystem: true,
+    sortOrder: 80,
+  },
+];
+
+export const SYSTEM_PLATOONS: Platoon[] = [
+  {
+    id: "plt-vz1",
+    key: "vz1",
+    label: "1 взвод",
+    sortOrder: 10,
+    isSystem: true,
+  },
+  {
+    id: "plt-vz2",
+    key: "vz2",
+    label: "2 взвод",
+    sortOrder: 20,
+    isSystem: true,
+  },
+  {
+    id: "plt-prk",
+    key: "prk",
+    label: "Прикомандированные",
+    sortOrder: 30,
+    isSystem: true,
+  },
+  {
+    id: "plt-ps",
+    key: "ps",
+    label: "Постоянный состав",
+    sortOrder: 40,
+    isSystem: true,
+  },
+];
+
+export const SERVICE_SECTIONS = [
+  { key: "overview", label: "Обзор" },
+  { key: "all", label: "Все взвода" },
+  { key: "groups", label: "Группы" },
+  { key: "tasks", label: "Задачи" },
+] as const;
+
+export const MAX_LOG_ENTRIES = 300;
