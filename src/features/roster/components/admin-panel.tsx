@@ -116,7 +116,7 @@ function ReferenceTabs({ tab, onChange, vertical = false, snapshot }: { tab: Adm
                 ? "grid min-h-14 min-w-0 grid-cols-[24px_minmax(0,1fr)_18px] items-center gap-2.5 rounded-2xl border px-3 text-left transition duration-200 motion-reduce:transition-none"
                 : "inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-sm transition duration-200 motion-reduce:transition-none",
               selected
-                ? "border-cyan/45 bg-cyan/12 text-text-primary shadow-[0_8px_22px_oklch(77%_0.14_191/0.08)]"
+      ? "border-cyan/45 bg-cyan/12 text-text-primary"
                 : "border-line bg-transparent text-text-secondary hover:border-line-strong hover:bg-white/5 hover:text-text-primary",
             )}
             aria-current={selected ? "page" : undefined}
@@ -153,7 +153,7 @@ function ReferenceSummary({ snapshot }: { snapshot: Snapshot }) {
   return (
     <div className="grid grid-cols-4 gap-3 max-[720px]:grid-cols-2">
       {items.map((item) => (
-        <div key={item.label} className="rounded-2xl border border-line bg-bg-panel/70 px-4 py-3 shadow-(--shadow)">
+        <div key={item.label} className="rounded-2xl border border-line bg-bg-panel/70 px-4 py-3">
           <strong className={cx("block font-mono text-2xl leading-none", item.tone)}>{item.value}</strong>
           <span className="mt-1.5 block text-xs text-text-muted">{item.label}</span>
         </div>
@@ -204,7 +204,7 @@ export function AdminPanel({
     return (
       <main ref={panelRef} className="h-dvh max-h-dvh min-h-0 overflow-y-auto overscroll-contain bg-bg-base bg-[radial-gradient(circle_at_15%_-10%,oklch(32%_0.12_302/0.22),transparent_36%),radial-gradient(circle_at_90%_8%,oklch(34%_0.11_193/0.16),transparent_30%)]">
         <div className="mx-auto grid min-h-dvh w-full max-w-360 content-start gap-6 px-6 py-6 max-[720px]:gap-4 max-[720px]:px-4 max-[720px]:py-4">
-          <header className="flex min-w-0 items-start justify-between gap-5 rounded-3xl border border-line bg-bg-panel/75 px-6 py-5 shadow-(--shadow) max-[720px]:px-4 max-[720px]:py-4">
+          <header className="flex min-w-0 items-start justify-between gap-5 rounded-3xl border border-line bg-bg-panel/75 px-6 py-5 max-[720px]:px-4 max-[720px]:py-4">
             <div className="min-w-0">
               <p className="m-0 text-[11px] font-bold uppercase tracking-[0.16em] text-cyan">Администрирование</p>
               <h1 className="m-0 mt-2 text-3xl font-black tracking-[-0.03em] text-text-primary max-[720px]:text-2xl">Справочники</h1>
@@ -221,7 +221,7 @@ export function AdminPanel({
 
           <div className="grid min-w-0 items-start gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
             <ReferenceTabs tab={tab} onChange={setTab} snapshot={snapshot} vertical />
-            <section className="min-w-0 overflow-hidden rounded-3xl border border-line bg-bg-panel/75 shadow-(--shadow)" aria-labelledby="reference-content-title">
+            <section className="min-w-0 overflow-hidden rounded-3xl border border-line bg-bg-panel/75" aria-labelledby="reference-content-title">
               <div className="flex min-w-0 items-start justify-between gap-4 border-b border-line px-5 py-4 max-[720px]:px-4">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 text-cyan">{referenceTabIcon(tab)}<span className="text-[11px] font-bold uppercase tracking-[0.14em]">Раздел справочника</span></div>

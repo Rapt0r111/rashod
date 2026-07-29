@@ -251,7 +251,7 @@ export function MobileSectionNav({
 }) {
   const items = sectionItems(people, counts, canReadGroups, canReadTasks);
   return (
-    <nav className="sticky top-0 z-20 -mx-4 mb-3 hidden gap-2 overflow-x-auto overscroll-x-contain border-b border-line bg-[color-mix(in_oklch,var(--bg-base)_95%,transparent)] px-4 py-2.5 pb-3 max-[900px]:flex" aria-label="Разделы">
+    <nav className="top-0 z-20 -mx-4 mb-3 hidden gap-2 overflow-x-auto overscroll-x-contain border-b border-line bg-[color-mix(in_oklch,var(--bg-base)_95%,transparent)] px-4 py-2.5 pb-3 max-[900px]:flex" aria-label="Разделы">
       {items.map((item) => (
         <button
           key={item.key}

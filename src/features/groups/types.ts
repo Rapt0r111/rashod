@@ -116,6 +116,7 @@ export type GroupCreateInput = {
 
 export type GroupUpdateInput = {
   id: string;
+  expectedUpdatedAt?: number;
   name?: string;
   templateId?: string;
   notes?: string;
@@ -124,6 +125,7 @@ export type GroupUpdateInput = {
 
 export type RuleUpdateInput = {
   groupId: string;
+  expectedUpdatedAt?: number;
   enabledPlatoons?: string[];
   peoplePerDay?: number;
   autoRotate?: boolean;

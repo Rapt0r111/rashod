@@ -10,7 +10,7 @@ test("administrator opens the roster and can sign out", async ({ page }) => {
 test("browser Back returns from an internal service section", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Группы", exact: true }).first().click();
-  await expect(page.getByRole("heading", { level: 1, name: /Наряды/ })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /Распределение/ })).toBeVisible();
   await page.goBack();
   await expect(page.getByLabel("Расход личного состава")).toBeVisible();
 });
@@ -49,8 +49,36 @@ test.describe("groups read-only role", () => {
 
   test("lands on groups without write controls", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { level: 1, name: /Наряды/ })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /Распределение/ })).toBeVisible();
     await expect(page.getByRole("button", { name: "Создать группу" })).toHaveCount(0);
+  });
+});
+
+test.describe("groups writer resilience", () => {
+  test.use({ storageState: "playwright/.auth/groups-writer.json" });
+
+  test("keeps recovery available after a failed rotation", async ({ page }) => {
+    await page.goto("/");
+    await page.route("**/api/groups/rotate", (route) => route.abort("failed"));
+    await page.getByRole("button", { name: /ротацию/i }).click();
+    const alert = page
+      .getByRole("alert")
+      .filter({ hasText: "Действие не завершено" });
+    await expect(alert).toContainText("Проверьте соединение и повторите попытку.");
+    await expect(alert.getByRole("button", { name: "Обновить данные" })).toBeVisible();
+  });
+
+  test("requires an in-app confirmation before deleting a group", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Опасная зона" }).click();
+    await page.getByRole("button", { name: "Удалить группу" }).click();
+
+    const confirmation = page
+      .getByRole("alert")
+      .filter({ hasText: "Удалить группу?" });
+    await expect(confirmation).toContainText("без возможности отмены");
+    await expect(confirmation.getByRole("button", { name: "Отмена" })).toBeVisible();
+    await expect(confirmation.getByRole("button", { name: "Удалить" })).toBeVisible();
   });
 });
 

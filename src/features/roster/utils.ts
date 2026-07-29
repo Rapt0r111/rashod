@@ -66,6 +66,48 @@ export function filterPeople(people: Person[], query: string) {
   return filterListItems(people, query, (person) => `${person.rank} ${person.name} ${person.conscriptionNumber ?? ""}`);
 }
 
+export type RosterFilterState = {
+  locationFilter: string | null;
+  locationFilterKeys: string[] | null;
+  conscriptionFilter: string | null;
+  conscriptionFilterKeys: string[] | null;
+  platoonFilter: string | null;
+  platoonFilterKeys: string[] | null;
+};
+
+export function selectedFilterKeys(keys: string[] | null, active: string | null) {
+  return keys ?? (active ? [active] : []);
+}
+
+export function filterPeopleByRosterFilters(
+  people: Person[],
+  filters: RosterFilterState,
+) {
+  const selectedPlatoonKeys = selectedFilterKeys(
+    filters.platoonFilterKeys,
+    filters.platoonFilter,
+  );
+  const selectedLocationKeys = selectedFilterKeys(
+    filters.locationFilterKeys,
+    filters.locationFilter,
+  );
+  const selectedConscriptionKeys = selectedFilterKeys(
+    filters.conscriptionFilterKeys,
+    filters.conscriptionFilter,
+  );
+
+  return people.filter(
+    (person) =>
+      (!selectedPlatoonKeys.length ||
+        selectedPlatoonKeys.includes(person.platoonId)) &&
+      (!selectedLocationKeys.length ||
+        selectedLocationKeys.includes(person.location)) &&
+      (!selectedConscriptionKeys.length ||
+        (person.conscriptionNumber !== null &&
+          selectedConscriptionKeys.includes(person.conscriptionNumber))),
+  );
+}
+
 export function peopleForPlatoon(people: Person[], platoonId: string) {
   return people.filter((person) => person.platoonId === platoonId);
 }

@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 
 const schema = z.object({
   groupId: idString,
+  expectedUpdatedAt: z.number().int().nonnegative().optional(),
   enabledPlatoons: uniqueArray(idString, 64).optional(),
   peoplePerDay: z.number().int().min(1).max(40).optional(),
   autoRotate: z.boolean().optional(),

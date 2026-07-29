@@ -541,11 +541,21 @@ export async function updatePostgresDutyGroup(input: GroupUpdateInput): Promise<
     const template = await sql`SELECT 1 FROM group_templates WHERE id = ${input.templateId}`;
     if (!template.length) throw new Error("TEMPLATE_NOT_FOUND");
   }
-  await sql`
-    UPDATE duty_groups SET template_id = ${input.templateId ?? current.templateId}, name = ${input.name?.trim() ?? current.name},
-      notes = ${input.notes?.trim() ?? current.notes}, enabled = ${input.enabled ?? current.enabled}, updated_at = now()
-    WHERE id = ${input.id}
-  `;
+  const updated = input.expectedUpdatedAt === undefined
+    ? await sql<DbGroup[]>`
+        UPDATE duty_groups SET template_id = ${input.templateId ?? current.templateId}, name = ${input.name?.trim() ?? current.name},
+          notes = ${input.notes?.trim() ?? current.notes}, enabled = ${input.enabled ?? current.enabled}, updated_at = now()
+        WHERE id = ${input.id}
+        RETURNING id, template_id AS "templateId", name, notes, enabled, sort_order AS "sortOrder", created_at, updated_at
+      `
+    : await sql<DbGroup[]>`
+        UPDATE duty_groups SET template_id = ${input.templateId ?? current.templateId}, name = ${input.name?.trim() ?? current.name},
+          notes = ${input.notes?.trim() ?? current.notes}, enabled = ${input.enabled ?? current.enabled}, updated_at = now()
+        WHERE id = ${input.id}
+          AND FLOOR(EXTRACT(EPOCH FROM updated_at) * 1000) = ${input.expectedUpdatedAt}
+        RETURNING id, template_id AS "templateId", name, notes, enabled, sort_order AS "sortOrder", created_at, updated_at
+      `;
+  if (!updated.length) throw new Error("GROUP_STALE_WRITE");
   return refreshPostgresAutomaticDutyAssignments();
 }
 
@@ -556,6 +566,16 @@ export async function deletePostgresDutyGroup(id: string): Promise<GroupsSnapsho
 
 export async function updatePostgresDutyGroupRule(input: RuleUpdateInput): Promise<GroupsSnapshot> {
   const sql = pg();
+  const [group] = await sql<Array<{ updatedAt: Date }>>`
+    SELECT updated_at AS "updatedAt" FROM duty_groups WHERE id = ${input.groupId}
+  `;
+  if (!group) throw new Error("GROUP_NOT_FOUND");
+  if (
+    input.expectedUpdatedAt !== undefined &&
+    Math.floor(group.updatedAt.getTime()) !== input.expectedUpdatedAt
+  ) {
+    throw new Error("GROUP_STALE_WRITE");
+  }
   const current = await getDutyRule(input.groupId, sql);
   const existing = await sql`SELECT 1 FROM group_rules WHERE group_id = ${input.groupId}`;
   if (!existing.length) {
@@ -578,6 +598,15 @@ export async function updatePostgresDutyGroupRule(input: RuleUpdateInput): Promi
       auto_rotate = ${rule.autoRotate}, active_days = ${sql.json(rule.activeDays)}::jsonb, priority_mode = ${rule.priorityMode}
     WHERE group_id = ${input.groupId}
   `;
+  const touched = input.expectedUpdatedAt === undefined
+    ? await sql`UPDATE duty_groups SET updated_at = now() WHERE id = ${input.groupId} RETURNING id`
+    : await sql`
+        UPDATE duty_groups SET updated_at = now()
+        WHERE id = ${input.groupId}
+          AND FLOOR(EXTRACT(EPOCH FROM updated_at) * 1000) = ${input.expectedUpdatedAt}
+        RETURNING id
+      `;
+  if (!touched.length) throw new Error("GROUP_STALE_WRITE");
   return refreshPostgresAutomaticDutyAssignments();
 }
 

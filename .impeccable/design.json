@@ -1,0 +1,225 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-29",
+  "title": "Design System: Rashod",
+  "extensions": {
+    "colorMeta": {
+      "bg-base": {
+        "role": "neutral",
+        "displayName": "Indigo Night",
+        "canonical": "oklch(13% 0.036 286)",
+        "tonalRamp": [
+          "oklch(9% 0.03 286)",
+          "oklch(13% 0.036 286)",
+          "oklch(17% 0.038 286)",
+          "oklch(21% 0.042 286)"
+        ]
+      },
+      "bg-panel": {
+        "role": "neutral",
+        "displayName": "Panel Indigo",
+        "canonical": "oklch(17% 0.038 286 / 0.88)",
+        "tonalRamp": [
+          "oklch(13% 0.036 286)",
+          "oklch(17% 0.038 286)",
+          "oklch(21% 0.042 286)",
+          "oklch(25% 0.045 286)"
+        ]
+      },
+      "bg-raised": {
+        "role": "neutral",
+        "displayName": "Raised Indigo",
+        "canonical": "oklch(21% 0.042 286 / 0.82)",
+        "tonalRamp": [
+          "oklch(17% 0.038 286)",
+          "oklch(21% 0.042 286)",
+          "oklch(25% 0.045 286)",
+          "oklch(29% 0.048 286)"
+        ]
+      },
+      "primary": {
+        "role": "primary",
+        "displayName": "Command Orchid",
+        "canonical": "oklch(68% 0.19 302)",
+        "tonalRamp": [
+          "oklch(48% 0.16 302)",
+          "oklch(58% 0.18 302)",
+          "oklch(68% 0.19 302)",
+          "oklch(78% 0.16 302)"
+        ]
+      },
+      "cyan": {
+        "role": "secondary",
+        "displayName": "Operational Cyan",
+        "canonical": "oklch(77% 0.14 191)",
+        "tonalRamp": [
+          "oklch(57% 0.12 191)",
+          "oklch(67% 0.14 191)",
+          "oklch(77% 0.14 191)",
+          "oklch(87% 0.1 191)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Quiet Line",
+        "canonical": "oklch(82% 0.06 286 / 0.14)",
+        "tonalRamp": [
+          "oklch(82% 0.06 286 / 0.08)",
+          "oklch(82% 0.06 286 / 0.14)",
+          "oklch(82% 0.08 286 / 0.28)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Operational Display",
+        "purpose": "Large workspace headings only; never marketing hero copy."
+      },
+      "mono": {
+        "displayName": "Readout Mono",
+        "purpose": "Aligned time, counts and operational values."
+      }
+    },
+    "shadows": [
+      {
+        "name": "ambient-app-surface",
+        "value": "0 12px 30px rgb(0 0 0 / 0.28), inset 0 1px 0 rgb(255 255 255 / 0.05)",
+        "purpose": "Large app-level surfaces and panels."
+      },
+      {
+        "name": "operator-surface",
+        "value": "0 14px 34px rgb(0 0 0 / 0.2)",
+        "purpose": "Sticky operator bar above scrollable roster data."
+      },
+      {
+        "name": "overlay-surface",
+        "value": "30px 0 90px rgb(0 0 0 / 0.42)",
+        "purpose": "Section drawer and large overlay panels."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state-transition",
+        "value": "200ms ease-out",
+        "purpose": "Border, background, color and transform state changes."
+      },
+      {
+        "name": "loader",
+        "value": "2.5s infinite",
+        "purpose": "Loading-only state; collapse to near-instant under prefers-reduced-motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "tablet-shell",
+        "value": "900px",
+        "purpose": "Collapse desktop sidebar and expose the section drawer."
+      },
+      {
+        "name": "compact-tablet",
+        "value": "560px",
+        "purpose": "Compact brand copy and preserve icon-sized actions."
+      },
+      {
+        "name": "wide-shell",
+        "value": "1180px",
+        "purpose": "Reduce sidebar and top-bar density."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The main commit action in a form or operational flow.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\">Назначить</button>",
+      "css": ".ds-btn-primary { min-height: 42px; padding: 0 16px; border: 1px solid var(--accent-line); border-radius: var(--radius-control); background: var(--accent); color: oklch(12% 0.04 286); font: 600 12px/1.35 var(--font-geist-sans), system-ui, sans-serif; transition: background 200ms ease-out, border-color 200ms ease-out, transform 200ms ease-out; } .ds-btn-primary:hover { background: color-mix(in oklch, var(--accent) 88%, white 12%); } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "A quiet alternative action that stays available without competing with the commit action.",
+      "html": "<button class=\"ds-btn-secondary\" type=\"button\">Открыть журнал</button>",
+      "css": ".ds-btn-secondary { min-height: 42px; padding: 0 16px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg-raised); color: var(--text-primary); font: 600 12px/1.35 var(--font-geist-sans), system-ui, sans-serif; transition: background 200ms ease-out, border-color 200ms ease-out, color 200ms ease-out; } .ds-btn-secondary:hover { border-color: var(--line-strong); background: color-mix(in oklch, var(--bg-raised) 88%, white 12%); } .ds-btn-secondary:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }"
+    },
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "A compact search field used beside roster filters and sorting.",
+      "html": "<label class=\"ds-search\"><span class=\"ds-search-icon\" aria-hidden=\"true\">⌕</span><input type=\"search\" placeholder=\"Найти человека\" /></label>",
+      "css": ".ds-search { display: flex; min-height: 42px; align-items: center; gap: 8px; min-width: 240px; padding: 0 10px; border: 1px solid var(--line); border-radius: 11px; background: color-mix(in oklch, var(--bg-base) 94%, white 6%); color: var(--text-muted); transition: border-color 200ms ease-out, box-shadow 200ms ease-out; } .ds-search:focus-within { border-color: var(--primary-line); box-shadow: 0 0 0 3px var(--primary-soft); } .ds-search input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; color: var(--text-primary); font: 400 14px/1.45 var(--font-geist-sans), system-ui, sans-serif; } .ds-search input::placeholder { color: var(--text-muted); } .ds-search-icon { color: var(--text-muted); font-size: 20px; }"
+    },
+    {
+      "name": "Custom Select Trigger",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "The trigger for a keyboard-navigable custom listbox, not a native select.",
+      "html": "<button class=\"ds-select\" type=\"button\" aria-haspopup=\"listbox\" aria-expanded=\"false\"><span>По алфавиту</span><span aria-hidden=\"true\">⌄</span></button>",
+      "css": ".ds-select { display: flex; min-height: 42px; width: 180px; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg-raised); color: var(--text-primary); font: 600 12px/1.35 var(--font-geist-sans), system-ui, sans-serif; transition: border-color 200ms ease-out, background 200ms ease-out; } .ds-select:hover, .ds-select[aria-expanded=\"true\"] { border-color: color-mix(in oklch, var(--cyan) 52%, transparent); background: color-mix(in oklch, var(--cyan) 9%, var(--bg-raised)); } .ds-select:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }"
+    },
+    {
+      "name": "Active Navigation Item",
+      "kind": "nav",
+      "refersTo": "nav-active",
+      "description": "The current section state in the desktop sidebar or mobile drawer.",
+      "html": "<button class=\"ds-nav-active\" type=\"button\" aria-current=\"page\"><span aria-hidden=\"true\">●</span><span>Весь состав</span><strong>42</strong></button>",
+      "css": ".ds-nav-active { display: grid; min-height: 42px; width: 100%; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 0 8px; border: 1px solid color-mix(in oklch, var(--cyan) 32%, transparent); border-radius: 13px; background: color-mix(in oklch, var(--cyan) 12%, transparent); color: var(--cyan); text-align: left; font: 600 12px/1.35 var(--font-geist-sans), system-ui, sans-serif; } .ds-nav-active strong { color: var(--text-muted); font: 700 11px/1.2 var(--font-geist-mono), monospace; } .ds-nav-active:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }"
+    },
+    {
+      "name": "Summary Chip",
+      "kind": "chip",
+      "refersTo": "summary-chip",
+      "description": "A compact readout for totals, rota counts and secondary metrics.",
+      "html": "<div class=\"ds-summary\"><strong>42</strong><span>всего</span></div>",
+      "css": ".ds-summary { display: inline-grid; min-width: 68px; gap: 2px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 13px; background: color-mix(in oklch, var(--bg-raised) 82%, transparent); } .ds-summary strong { color: var(--text-primary); font: 700 16px/1 var(--font-geist-mono), monospace; } .ds-summary span { color: var(--text-muted); font: 600 11px/1.35 var(--font-geist-sans), system-ui, sans-serif; }"
+    },
+    {
+      "name": "Operator Bar",
+      "kind": "custom",
+      "refersTo": "summary-chip",
+      "description": "Tablet-first sticky surface combining location readouts and roster search.",
+      "html": "<section class=\"ds-operator\" aria-label=\"Оперативная панель\"><div class=\"ds-operator-row\"><span class=\"ds-summary ds-summary-accent\"><strong>42</strong><span>всего</span></span><span class=\"ds-location\">Казарма <b>18</b></span><span class=\"ds-location\">Госпиталь <b>3</b></span></div><label class=\"ds-search\"><span class=\"ds-search-icon\" aria-hidden=\"true\">⌕</span><input type=\"search\" placeholder=\"Найти человека\" /></label></section>",
+      "css": ".ds-operator { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 16px; background: color-mix(in oklch, var(--bg-base) 94%, transparent); box-shadow: 0 14px 34px rgb(0 0 0 / 0.2); } .ds-operator-row { display: flex; min-width: 0; gap: 8px; overflow-x: auto; padding-bottom: 2px; } .ds-summary-accent { border-color: var(--primary-line); background: var(--primary-soft); } .ds-summary-accent strong { color: var(--primary); } .ds-location { display: inline-flex; min-height: 42px; flex: 0 0 auto; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid var(--line); border-radius: 13px; background: color-mix(in oklch, var(--bg-raised) 80%, transparent); color: var(--text-primary); font: 600 12px/1.35 var(--font-geist-sans), system-ui, sans-serif; } .ds-location b { color: var(--cyan); font: 700 14px/1.2 var(--font-geist-mono), monospace; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Оперативный рабочий стол",
+    "overview": "Rashod — спокойный тёмный рабочий интерфейс для контроля и распределения личного состава. Он держит состояние и следующее действие рядом, чтобы оператор мог работать быстро и уверенно на desktop или планшете. Визуальная выразительность строится на точных слоях, семантическом цвете и согласованных controls, а не на игрушечной декоративности.",
+    "keyCharacteristics": [
+      "Deep indigo workspace with restrained orchid accent",
+      "Cyan focus and operational attention",
+      "Dense but readable data-first layout",
+      "Touch-friendly 42px controls and tablet operator bar",
+      "Mono readouts for time, counts and aligned values"
+    ],
+    "rules": [
+      {
+        "name": "The Operational Accent Rule",
+        "body": "Orchid and cyan communicate action, focus, selection or state; they are not decorative surface fills.",
+        "section": "colors"
+      },
+      {
+        "name": "The Calm Hierarchy Rule",
+        "body": "Use measured type scale, weight and contrast instead of oversized display typography.",
+        "section": "typography"
+      },
+      {
+        "name": "The Layered-By-Default Rule",
+        "body": "Use tonal surfaces and quiet lines before adding a shadow; reserve wide shadows for app-level surfaces.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do keep tablet controls touch-friendly and preserve visible focus.",
+      "Do reuse the shared custom listbox, search/sort and icon vocabulary."
+    ],
+    "donts": [
+      "Don't make the interface look игрушечным.",
+      "Don't use gradient text, colored side stripes, repeating stripe backgrounds or sketchy illustrations.",
+      "Don't turn every ordinary control into a floating glass card."
+    ]
+  }
+}

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { z, ZodError, type ZodType } from "zod";
+import z, { ZodError, type ZodType } from "zod";
 import { recordAuditEvent, type AuthContext } from "@/server/auth";
 import { inPostgresTransaction } from "@/server/db/postgres";
 
@@ -16,6 +16,7 @@ const ERROR_STATUS: Readonly<Record<string, number>> = {
   GROUP_ASSIGNMENT_CONFLICT: 409,
   GROUP_ASSIGNMENT_INELIGIBLE: 409,
   GROUP_ASSIGNMENT_OVERFILLED: 409,
+  GROUP_STALE_WRITE: 409,
   GROUP_NOT_FOUND: 404,
   GROUP_TEMPLATE_REQUIRED: 400,
   INVALID_ROLE_KEY: 400,
@@ -62,7 +63,16 @@ export const optionalIdString = idString.optional();
 export const uuidString = z.string().uuid();
 export const sortOrderNumber = z.number().int().min(0).max(9_999_999_999);
 export const sortOrder = sortOrderNumber.optional();
-export const dateKeyString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+export const dateKeyString = z.string().refine((value) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return (
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day
+  );
+}, "INVALID_DATE");
 export const dateString = dateKeyString;
 export const dayOfWeekNumber = z.number().int().min(0).max(6);
 

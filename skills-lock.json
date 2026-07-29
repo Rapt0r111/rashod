@@ -3,8 +3,9 @@
   "skills": {
     "accessibility": {
       "source": "addyosmani/web-quality-skills",
-      "sourceType": "autoskills-registry",
-      "computedHash": "bffe3d08cfe92ebad63699f74ce29e35c19850ebfbf474c1463183cfe34d6a09"
+      "sourceType": "github",
+      "skillPath": "skills/accessibility/SKILL.md",
+      "computedHash": "ebfa09617a2ac4fd64afd73267726b787145a8d14294df3f8802b462c91594ab"
     },
     "bun": {
       "source": "midudev/autoskills",
@@ -72,7 +73,7 @@
       "source": "heygen-com/hyperframes",
       "sourceType": "github",
       "skillPath": "skills/hyperframes-core/SKILL.md",
-      "computedHash": "66551106587ecd39e4bb545bceb37ec8be237a00c185e7dd907245d9c6c93d3f"
+      "computedHash": "874a8867e00987cbf30a929ce023f2b900148a20a6d3f26a909ec05c7ca32d02"
     },
     "next-best-practices": {
       "source": "vercel-labs/next-skills",
@@ -96,8 +97,9 @@
     },
     "seo": {
       "source": "addyosmani/web-quality-skills",
-      "sourceType": "autoskills-registry",
-      "computedHash": "c184da724d1c61ad077f27418ea8e7e88fd54bcdf98165e18be7e4681cbd5e20"
+      "sourceType": "github",
+      "skillPath": "skills/seo/SKILL.md",
+      "computedHash": "3d72168e266b759454b3e16028e7306ec716f21de6878cac7e98a0a3834ab5db"
     },
     "tailwind-css-patterns": {
       "source": "giuseppe-trisciuoglio/developer-kit",

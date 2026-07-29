@@ -36,6 +36,23 @@ describe("Tablet operator workflow contract", () => {
     expect(app).toContain("Не удалось изменить местоположение");
   });
 
+  it("keeps the polished roster rail quiet and recognizable", () => {
+    const topBar = read("src/features/roster/components/top-bar.tsx");
+    const operatorBar = read("src/features/roster/components/operator-bar.tsx");
+    const people = read("src/features/roster/components/person-views.tsx");
+    const app = read("src/features/roster/RosterApp.tsx");
+
+    expect(topBar).toContain('className="ml-auto flex shrink-0');
+    expect(operatorBar).not.toContain("shadow-[0_14px_34px");
+    expect(people).toContain("<MapPin");
+    expect(people).not.toContain("max-[560px]:flex-wrap");
+    expect(people).not.toContain("max-[460px]:order-2");
+    expect(people).toContain("max-[560px]:overflow-x-auto");
+    expect(people).toContain("touch-pan-x");
+    expect(people).toContain("overscroll-x-contain");
+    expect(app).not.toContain('aria-live="polite"');
+  });
+
   it("does not combine equivalent text-wrapping utilities", () => {
     const people = read("src/features/roster/components/person-views.tsx");
 

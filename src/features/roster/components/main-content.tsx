@@ -27,6 +27,8 @@ import {
   locationToken,
   relativeTime,
   filterPeople,
+  filterPeopleByRosterFilters,
+  selectedFilterKeys,
 } from "../utils";
 import { locationsAndCustom, overviewLocationMetrics } from "../roster-metrics";
 import { normalizeOverviewSettings, overviewBlock } from "../overview-settings";
@@ -233,21 +235,22 @@ function Overview({
   );
   const filteredPeople = useMemo(
     () =>
-      people.filter(
-        (person) =>
-          (!selectedPlatoonKeys.length ||
-            selectedPlatoonKeys.includes(person.platoonId)) &&
-          (!selectedLocationKeys.length ||
-            selectedLocationKeys.includes(person.location)) &&
-          (!selectedConscriptionKeys.length ||
-            (person.conscriptionNumber !== null &&
-              selectedConscriptionKeys.includes(person.conscriptionNumber))),
-      ),
+      filterPeopleByRosterFilters(people, {
+        platoonFilter: ui.platoonFilter,
+        platoonFilterKeys: ui.platoonFilterKeys,
+        locationFilter: ui.locationFilter,
+        locationFilterKeys: ui.locationFilterKeys,
+        conscriptionFilter: ui.conscriptionFilter,
+        conscriptionFilterKeys: ui.conscriptionFilterKeys,
+      }),
     [
       people,
-      selectedConscriptionKeys,
-      selectedLocationKeys,
-      selectedPlatoonKeys,
+      ui.conscriptionFilter,
+      ui.conscriptionFilterKeys,
+      ui.locationFilter,
+      ui.locationFilterKeys,
+      ui.platoonFilter,
+      ui.platoonFilterKeys,
     ],
   );
   const filteredPersonIds = useMemo(
@@ -579,7 +582,7 @@ function Overview({
           >
             <section
               className={cx(
-                "grid min-w-0 overflow-hidden rounded-2xl border border-line bg-bg-panel shadow-(--shadow)",
+                "grid min-w-0 overflow-hidden rounded-2xl border border-line bg-bg-panel",
                 panelDensity("location-distribution"),
               )}
             >
@@ -705,7 +708,7 @@ function Overview({
           >
             <section
               className={cx(
-                "grid min-w-0 overflow-hidden rounded-2xl border border-line bg-bg-panel shadow-(--shadow)",
+                "grid min-w-0 overflow-hidden rounded-2xl border border-line bg-bg-panel",
                 panelDensity("platoons"),
               )}
             >
@@ -779,7 +782,7 @@ function Overview({
           >
             <section
               className={cx(
-                "grid min-w-0 overflow-hidden rounded-2xl border border-line bg-bg-panel shadow-(--shadow)",
+                "grid min-w-0 overflow-hidden rounded-2xl border border-line bg-bg-panel",
                 panelDensity("location-cards"),
               )}
             >
@@ -914,7 +917,7 @@ function Overview({
           >
             <section
               className={cx(
-                "grid min-w-0 overflow-hidden rounded-2xl border border-line bg-bg-panel shadow-(--shadow)",
+                "grid min-w-0 overflow-hidden rounded-2xl border border-line bg-bg-panel",
                 panelDensity("recent-activity"),
               )}
             >
@@ -1019,10 +1022,6 @@ function overviewDateTime(ts: number) {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function selectedFilterKeys(keys: string[] | null, active: string | null) {
-  return keys ?? (active ? [active] : []);
 }
 
 function sortOverviewItemsByCount(items: OverviewLocationMetricLike[]) {
@@ -1481,7 +1480,7 @@ const StatCard = memo(function StatCard({
   trend?: "up" | "down";
 }) {
   return (
-    <div className="min-w-0  overflow-hidden rounded-2xl border border-line bg-bg-panel p-4.5 shadow-(--shadow)">
+    <div className="min-w-0 overflow-hidden rounded-2xl border border-line bg-bg-panel p-4.5">
       <strong
         className={cx(
           "block font-mono text-[30px] font-extrabold leading-none tabular-nums",
@@ -1552,7 +1551,7 @@ const FilterPills = memo(function FilterPills({
             className={cx(
               "inline-flex min-h-9 cursor-pointer items-center justify-center gap-1.5 rounded-full border px-3 text-xs transition-[background,border-color,box-shadow,color,filter] duration-200 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-bg-panel",
               selected
-                ? "border-accent bg-accent font-extrabold text-[oklch(12%_0.04_286)] shadow-[0_0_0_2px_var(--accent),0_0_18px_oklch(68%_0.19_302/0.22)] hover:brightness-110"
+      ? "border-accent bg-accent font-extrabold text-[oklch(12%_0.04_286)] hover:brightness-110"
                 : "border-line bg-white/4 text-text-secondary hover:border-line-strong hover:bg-white/8 hover:text-text-primary",
             )}
             onClick={() => onPick(item.key)}

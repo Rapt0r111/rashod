@@ -9,6 +9,7 @@ type SelectFieldProps = {
   value: string;
   options: Option[];
   onChange: (value: string) => void;
+  placeholder?: string;
   searchPlaceholder?: string;
   variant?: "admin" | "groups";
   disabled?: boolean;
@@ -20,6 +21,7 @@ export function SelectField({
   value,
   options,
   onChange,
+  placeholder,
   searchPlaceholder,
   variant = "groups",
   disabled = false,
@@ -34,7 +36,7 @@ export function SelectField({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
-  const selected = options.find((option) => option.value === value) ?? options[0];
+  const selected = options.find((option) => option.value === value);
 
   const visibleOptions = useMemo(() => {
     const needle = query.toLowerCase().trim();
@@ -137,7 +139,7 @@ export function SelectField({
           }
         }}
       >
-        <span className="min-w-0 flex-1 truncate">{selected?.label ?? ariaLabel}</span>
+        <span className="min-w-0 flex-1 truncate">{selected?.label ?? placeholder ?? ariaLabel}</span>
         <CaretDownIcon className={cx("shrink-0 transition-transform duration-200", open && "rotate-180")} size={16} weight="bold" aria-hidden="true" />
       </button>
       {open && (

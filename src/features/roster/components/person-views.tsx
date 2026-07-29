@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { MapPinIcon } from "@phosphor-icons/react";
 import type { LocationOption, Person } from "../types";
 import { abbreviateName, conscriptionLabel, cx, getInitials, locationLabel, locationToken } from "../utils";
 
@@ -38,25 +39,25 @@ export const RosterRow = memo(function RosterRow({
 }) {
   const quick = locations.filter((location) => location.isQuick);
   return (
-    <article className={cx("flex min-h-17 min-w-0 items-center gap-2.5 overflow-hidden rounded-[15px] border border-line bg-bg-panel p-2.5 shadow-[inset_0_1px_0_rgb(255_255_255/0.035)] max-[520px]:gap-2 max-[560px]:flex-wrap", flash && "border-accent-line! bg-[color-mix(in_oklch,var(--accent)_13%,transparent)]!")} aria-busy={pending || undefined}>
-      <Avatar person={person} />
-      <div className="grid min-w-0 flex-[1_1_0%] gap-0.75 overflow-hidden max-[460px]:order-2 max-[460px]:flex-[1_1_auto]">
+    <article className={cx("grid min-h-17 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2.5 overflow-hidden rounded-[15px] border border-line bg-bg-panel p-2.5 shadow-[inset_0_1px_0_rgb(255_255_255/0.035)] max-[520px]:gap-2 max-[560px]:grid-cols-1", flash && "border-accent-line! bg-[color-mix(in_oklch,var(--accent)_13%,transparent)]!")} aria-busy={pending || undefined}>
+      <div className="flex min-w-0 items-center gap-2.5 max-[520px]:gap-2">
+        <Avatar person={person} />
+        <div className="grid min-w-0 flex-1 gap-0.75 overflow-hidden">
         <strong className="max-w-full wrap-anywhere whitespace-normal">{abbreviateName(person.name)}</strong>
         <span className="max-w-full wrap-anywhere whitespace-normal text-xs text-text-muted">{person.rank}</span>
         {person.conscriptionNumber && <span className="max-w-full wrap-anywhere whitespace-normal text-xs text-text-muted">{conscriptionLabel(person.conscriptionNumber)}</span>}
         {contextLabel && <span className="max-w-full wrap-anywhere whitespace-normal text-xs text-text-muted">{contextLabel}</span>}
+        </div>
+        <LocationBadge value={person.location} locations={locations} />
       </div>
-      <LocationBadge value={person.location} locations={locations} />
       {canWrite && (
-        <>
-          <div className="h-8 w-px shrink-0 bg-line max-[460px]:hidden" />
-          <div className="flex min-w-0 shrink-0 gap-1.5 max-[460px]:order-5 max-[460px]:mt-2 max-[460px]:grid max-[460px]:flex-[1_1_100%] max-[460px]:grid-cols-4">
+        <div className="flex min-w-0 shrink-0 justify-end gap-1.5 max-[560px]:w-full max-[560px]:justify-start max-[560px]:overflow-x-auto max-[560px]:overscroll-x-contain max-[560px]:touch-pan-x max-[560px]:pb-0.5">
             {quick.map((location) => (
               <button
                 key={location.id}
                 type="button"
                 className={cx(
-                  "grid h-11 w-11 min-h-11 min-w-11 place-items-center rounded-[11px] border border-line bg-white/[0.035] font-extrabold text-text-secondary transition duration-200 active:translate-y-px max-[460px]:w-full",
+                  "grid h-11 w-11 min-h-11 min-w-11 shrink-0 place-items-center rounded-[11px] border border-line bg-white/[0.035] font-extrabold text-text-secondary transition duration-200 active:translate-y-px",
                   person.location === location.key && toneClasses(location.colorToken).text,
                   person.location === location.key && toneClasses(location.colorToken).border,
                   person.location === location.key && "shadow-[inset_0_0_0_1px_currentColor]",
@@ -71,17 +72,16 @@ export const RosterRow = memo(function RosterRow({
                 {location.quickCode}
               </button>
             ))}
-          </div>
           <button
-            className="grid h-11 w-11 min-h-11 min-w-11 shrink-0 place-items-center rounded-[11px] border border-line bg-white/[0.035] font-extrabold text-text-secondary transition duration-200 active:translate-y-px max-[460px]:order-3"
+            className="grid h-11 w-11 min-h-11 min-w-11 shrink-0 place-items-center rounded-[11px] border border-line bg-white/[0.035] font-extrabold text-text-secondary transition duration-200 active:translate-y-px"
             type="button"
             onClick={() => onMore(person.id)}
             aria-label={`Выбрать место для ${person.name}`}
             disabled={pending}
           >
-            ...
+            <MapPinIcon size={19} weight="bold" aria-hidden="true" />
           </button>
-        </>
+        </div>
       )}
     </article>
   );
@@ -103,7 +103,7 @@ export const PersonCard = memo(function PersonCard({
   return (
     <button
       type="button"
-      className={cx("grid min-h-34.5 gap-4 rounded-2xl border border-line bg-bg-panel p-3.5 text-left text-text-primary shadow-(--shadow) transition duration-200 active:translate-y-px disabled:cursor-default", flash && "border-accent-line! bg-[color-mix(in_oklch,var(--accent)_13%,transparent)]!")}
+      className={cx("grid min-h-34.5 gap-4 rounded-2xl border border-line bg-bg-panel p-3.5 text-left text-text-primary transition duration-200 active:translate-y-px disabled:cursor-default", flash && "border-accent-line! bg-[color-mix(in_oklch,var(--accent)_13%,transparent)]!")}
       onClick={() => canWrite && onClick(person.id)}
       disabled={!canWrite}
     >

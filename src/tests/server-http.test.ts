@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { z } from "zod";
-import { apiError, parseJson } from "@/server/http";
+import z from "zod";
+import { apiError, dateKeyString, parseJson } from "@/server/http";
 
 const json = (body: string, contentType = "application/json") =>
   new Request("http://localhost/api/test", {
@@ -22,6 +22,13 @@ describe("server HTTP contract", () => {
       json('{"ok":true}', "application/problem+json; charset=utf-8"),
       z.object({ ok: z.boolean() }),
     )).resolves.toEqual({ ok: true });
+  });
+
+  it("rejects impossible calendar dates before they reach a database query", () => {
+    expect(dateKeyString.safeParse("2026-02-28").success).toBe(true);
+    expect(dateKeyString.safeParse("2026-02-29").success).toBe(false);
+    expect(dateKeyString.safeParse("2024-02-29").success).toBe(true);
+    expect(dateKeyString.safeParse("2026-99-99").success).toBe(false);
   });
 
   it.each([

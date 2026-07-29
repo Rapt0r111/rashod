@@ -5,8 +5,10 @@ import {
   abbreviateName,
   countInRota,
   filterPeople,
+  filterPeopleByRosterFilters,
   locationLabel,
 } from "@/features/roster/utils";
+import type { Person } from "@/features/roster/types";
 
 describe("seed data", () => {
   it("creates stable default roster", () => {
@@ -23,6 +25,25 @@ describe("seed data", () => {
 });
 
 describe("filtering", () => {
+  it("filters the roster metrics source by all active roster filters", () => {
+    const people: Person[] = [
+      { id: "a", platoonId: "p1", rank: "r", name: "a", conscriptionNumber: "1", location: "rota", sortOrder: 1, createdAt: 1, updatedAt: 1 },
+      { id: "b", platoonId: "p1", rank: "r", name: "b", conscriptionNumber: "2", location: "naryad", sortOrder: 2, createdAt: 1, updatedAt: 1 },
+      { id: "c", platoonId: "p2", rank: "r", name: "c", conscriptionNumber: "1", location: "naryad", sortOrder: 3, createdAt: 1, updatedAt: 1 },
+    ];
+
+    expect(
+      filterPeopleByRosterFilters(people, {
+        platoonFilter: null,
+        platoonFilterKeys: ["p1"],
+        locationFilter: null,
+        locationFilterKeys: ["naryad"],
+        conscriptionFilter: "2",
+        conscriptionFilterKeys: null,
+      }).map((person) => person.id),
+    ).toEqual(["b"]);
+  });
+
   it("searches by rank and name without case sensitivity", () => {
     const seed = createSeedData();
     expect(filterPeople(seed.people, "капитан")).toHaveLength(1);

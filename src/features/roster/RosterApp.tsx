@@ -18,6 +18,7 @@ import {
   bySort,
   countInRota,
   filterPeople,
+  filterPeopleByRosterFilters,
 } from "./utils";
 import { initialUi, reducer, type ToastBatch } from "./state";
 import {
@@ -371,8 +372,28 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
     () => filterPeople(state.people, state.ui.searchQuery),
     [state.people, state.ui.searchQuery],
   );
-  const total = state.people.length;
-  const rota = useMemo(() => countInRota(state.people), [state.people]);
+  const operatorPeople = useMemo(
+    () =>
+      filterPeopleByRosterFilters(state.people, {
+        platoonFilter: state.ui.platoonFilter,
+        platoonFilterKeys: state.ui.platoonFilterKeys,
+        locationFilter: state.ui.locationFilter,
+        locationFilterKeys: state.ui.locationFilterKeys,
+        conscriptionFilter: state.ui.conscriptionFilter,
+        conscriptionFilterKeys: state.ui.conscriptionFilterKeys,
+      }),
+    [
+      state.people,
+      state.ui.conscriptionFilter,
+      state.ui.conscriptionFilterKeys,
+      state.ui.locationFilter,
+      state.ui.locationFilterKeys,
+      state.ui.platoonFilter,
+      state.ui.platoonFilterKeys,
+    ],
+  );
+  const total = operatorPeople.length;
+  const rota = useMemo(() => countInRota(operatorPeople), [operatorPeople]);
   const sectionCounts = {
     groups: groupsSnapshot?.groups.length,
     tasks: tasksSnapshot?.active.length,
@@ -385,8 +406,6 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
         К основному содержимому
       </a>
       <TopBar
-        total={total}
-        rota={rota}
         unseen={state.ui.hasUnseenHistory}
         isFullscreen={isFullscreen}
         onMenu={() => setMenuOpen(true)}
@@ -414,7 +433,6 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
           ref={mainRef}
           id="main-content"
           className="min-h-0 min-w-0 overflow-auto p-6 will-change-scroll max-[1180px]:p-4.5 max-[900px]:px-4 max-[900px]:pb-4"
-          aria-live="polite"
         >
           <MobileSectionNav
             people={state.people}
@@ -439,7 +457,7 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
           )}
           {isRosterSection && (
             <OperatorBar
-              people={state.people}
+              people={operatorPeople}
               locations={sortedLocations}
               locationGroups={state.locationGroups}
               total={total}

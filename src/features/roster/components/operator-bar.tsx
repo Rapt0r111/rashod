@@ -38,7 +38,7 @@ export const OperatorBar = memo(function OperatorBar({
 
   return (
     <section
-      className="mb-4 grid min-w-0 gap-2 rounded-2xl border border-line bg-[color-mix(in_oklch,var(--bg-base)_94%,transparent)] p-2.5 shadow-[0_14px_34px_rgb(0_0_0/0.2)] backdrop-blur-xl max-[900px]:top-17 max-[900px]:-mx-4 max-[900px]:rounded-none max-[900px]:border-x-0 max-[900px]:px-4"
+      className="mb-4 grid min-w-0 gap-2 rounded-2xl border border-line bg-[color-mix(in_oklch,var(--bg-base)_94%,transparent)] p-2.5 backdrop-blur-xl max-[900px]:top-17 max-[900px]:-mx-4 max-[900px]:rounded-none max-[900px]:border-x-0 max-[900px]:px-4"
       aria-label="Оперативная панель личного состава"
     >
       <div

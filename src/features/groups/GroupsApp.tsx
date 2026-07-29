@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
+  ArrowClockwiseIcon,
   BroomIcon,
   CalendarBlankIcon,
   CaretDownIcon,
@@ -16,7 +17,6 @@ import {
   TrashIcon,
   UserMinusIcon,
   UserPlusIcon,
-  UsersThreeIcon,
   WarningIcon,
   XIcon,
 } from "@phosphor-icons/react";
@@ -55,6 +55,7 @@ import {
   excludeGroupPerson,
   fetchGroupsSnapshot,
   includeGroupPerson,
+  getGroupErrorMessage,
   removeGroupAssignment,
   rotateGroup,
   updateGroup,
@@ -74,6 +75,10 @@ type PendingConflict = {
 const focusableSelector =
   'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+const GROUP_NAME_MAX_LENGTH = 120;
+const GROUP_NOTES_MAX_LENGTH = 1_000;
+const EXCLUSION_REASON_MAX_LENGTH = 500;
+
 function useDialogFocus(onClose: () => void) {
   const ref = useRef<HTMLElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
@@ -89,7 +94,7 @@ function useDialogFocus(onClose: () => void) {
         ? document.activeElement
         : null;
     const panel = ref.current;
-    window.setTimeout(
+    const focusTimeout = window.setTimeout(
       () => panel?.querySelector<HTMLElement>(focusableSelector)?.focus(),
       0,
     );
@@ -121,6 +126,7 @@ function useDialogFocus(onClose: () => void) {
 
     document.addEventListener("keydown", onKeyDown);
     return () => {
+      window.clearTimeout(focusTimeout);
       document.removeEventListener("keydown", onKeyDown);
       returnFocusRef.current?.focus();
     };
@@ -163,12 +169,15 @@ export function GroupsApp({
     initialSnapshot.weekDates[0] ?? "",
   );
   const [isBusy, setBusy] = useState(false);
+  const [isRefreshing, setRefreshing] = useState(false);
+  const [isLiveRefreshUnavailable, setLiveRefreshUnavailable] = useState(false);
   const [isCreateOpen, setCreateOpen] = useState(false);
   const [isAssignOpen, setAssignOpen] = useState(false);
   const [isExcludeOpen, setExcludeOpen] = useState(false);
   const [pendingConflict, setPendingConflict] = useState<PendingConflict>(null);
   const [platoons, setPlatoons] = useState<Platoon[]>(initialSnapshot.platoons);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [groupQuery, setGroupQuery] = useState("");
   const [groupSort, setGroupSort] = useState<ListSortState>({
     key: "alpha",
@@ -179,6 +188,10 @@ export function GroupsApp({
     key: "alpha",
     direction: "asc",
   });
+  const isMutatingRef = useRef(false);
+  const isRefreshingRef = useRef(false);
+  const snapshotRevisionRef = useRef(0);
+  const isMountedRef = useRef(true);
 
   const activeSnapshot = activeGroupId
     ? (snapshot.groupSnapshots[activeGroupId] ?? null)
@@ -187,8 +200,9 @@ export function GroupsApp({
     activeSnapshot?.week.find((day) => day.date === selectedDate) ??
     activeSnapshot?.week[0] ??
     null;
+  const effectiveSelectedDate = selectedDay?.date ?? selectedDate;
   const selectedAvailablePeople =
-    activeSnapshot?.availablePeopleByDate[selectedDate] ??
+    activeSnapshot?.availablePeopleByDate[effectiveSelectedDate] ??
     activeSnapshot?.availablePeople ??
     [];
   const totalConflicts = Object.values(snapshot.groupSnapshots).reduce(
@@ -238,6 +252,7 @@ export function GroupsApp({
   }, [assignmentQuery, assignmentSort, selectedDay]);
 
   const applySnapshot = useCallback((next: GroupsSnapshot) => {
+    if (!isMountedRef.current) return;
     setSnapshot(next);
     setPlatoons(next.platoons);
     setActiveGroupId((current) =>
@@ -250,98 +265,156 @@ export function GroupsApp({
     );
   }, []);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (showProgress = false) => {
+    if (isRefreshingRef.current) return;
+    isRefreshingRef.current = true;
+    const revision = snapshotRevisionRef.current;
+    if (showProgress) setRefreshing(true);
     try {
-      applySnapshot(await fetchGroupsSnapshot());
-    } catch {
-      setError("Не удалось обновить группы");
+      const next = await fetchGroupsSnapshot();
+      if (isMountedRef.current) setLiveRefreshUnavailable(false);
+      if (revision === snapshotRevisionRef.current) {
+        applySnapshot(next);
+        if (showProgress && isMountedRef.current) setError(null);
+      }
+    } catch (error) {
+      if (isMountedRef.current) {
+        setError(getGroupErrorMessage(error, "Не удалось обновить данные групп"));
+      }
+    } finally {
+      isRefreshingRef.current = false;
+      if (showProgress && isMountedRef.current) setRefreshing(false);
     }
   }, [applySnapshot]);
 
   useEffect(() => {
+    isMountedRef.current = true;
     const source = new EventSource("/api/events");
-    source.addEventListener("roster", () => refresh());
-    return () => source.close();
+    source.addEventListener("open", () => {
+      if (isMountedRef.current) setLiveRefreshUnavailable(false);
+    });
+    source.addEventListener("roster", () => void refresh());
+    source.addEventListener("error", () => {
+      if (isMountedRef.current && source.readyState !== EventSource.CLOSED) {
+        setLiveRefreshUnavailable(true);
+      }
+    });
+    return () => {
+      isMountedRef.current = false;
+      source.close();
+    };
   }, [refresh]);
 
   async function run(
     action: () => Promise<GroupsSnapshot>,
     message = "Операция не выполнена",
+    successMessage = "Изменения сохранены",
   ) {
-    if (!canWrite) return null;
+    if (!canWrite || isMutatingRef.current) return null;
+    isMutatingRef.current = true;
+    const revision = ++snapshotRevisionRef.current;
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       const next = await action();
-      applySnapshot(next);
+      if (revision === snapshotRevisionRef.current) {
+        applySnapshot(next);
+        snapshotRevisionRef.current += 1;
+        if (isMountedRef.current) setNotice(successMessage);
+      }
       return next;
-    } catch {
-      setError(message);
+    } catch (error) {
+      if (isMountedRef.current) setError(getGroupErrorMessage(error, message));
       return null;
     } finally {
-      setBusy(false);
+      isMutatingRef.current = false;
+      if (isMountedRef.current) setBusy(false);
     }
   }
 
   async function assignPerson(personId: string, allowConflict = false) {
-    if (!canWrite) return;
-    if (!activeGroupId || !selectedDate) return;
+    if (!canWrite || isMutatingRef.current) return;
+    if (!activeGroupId || !effectiveSelectedDate) return;
+    isMutatingRef.current = true;
+    const revision = ++snapshotRevisionRef.current;
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
-      applySnapshot(
-        await assignGroupPerson(
-          activeGroupId,
-          personId,
-          selectedDate,
-          allowConflict,
-        ),
+      const next = await assignGroupPerson(
+        activeGroupId,
+        personId,
+        effectiveSelectedDate,
+        allowConflict,
       );
-      setAssignOpen(false);
-      setPendingConflict(null);
+      if (revision === snapshotRevisionRef.current) {
+        applySnapshot(next);
+        snapshotRevisionRef.current += 1;
+      }
+      if (isMountedRef.current) {
+        setAssignOpen(false);
+        setPendingConflict(null);
+        setNotice(
+          allowConflict
+            ? "Назначение добавлено с подтверждённым пересечением."
+            : "Человек назначен.",
+        );
+      }
     } catch (err) {
-      if (err instanceof GroupApiError && err.status === 409) {
+      if (
+        err instanceof GroupApiError &&
+        err.code === "GROUP_ASSIGNMENT_CONFLICT" &&
+        err.conflicts.length > 0 &&
+        isMountedRef.current
+      ) {
         setPendingConflict({ personId, conflicts: err.conflicts });
-      } else {
-        setError("Назначение не выполнено");
+      } else if (isMountedRef.current) {
+        setError(getGroupErrorMessage(err, "Назначение не выполнено"));
       }
     } finally {
-      setBusy(false);
+      isMutatingRef.current = false;
+      if (isMountedRef.current) setBusy(false);
     }
   }
 
   return (
     <section
-      className="grid min-w-0 max-w-full gap-4 p-3 text-text-primary md:p-4.5"
-      aria-busy={isBusy}
+      className="grid min-w-0 max-w-full gap-3.5 p-3 text-text-primary md:gap-4 md:p-4.5"
+      aria-busy={isBusy || isRefreshing}
     >
-      <header className="grid min-w-0 items-end gap-4.5 rounded-[22px] border border-line bg-[linear-gradient(135deg,oklch(22%_0.05_286/0.9),oklch(16%_0.035_286/0.82))] p-4.5 shadow-(--shadow) lg:grid-cols-[minmax(0,1fr)_auto]">
+      <p className="sr-only" role="status" aria-live="polite">
+        {isBusy ? "Сохраняем изменения" : isRefreshing ? "Обновляем данные" : ""}
+      </p>
+      {notice && (
+        <div
+          className="flex min-w-0 items-center gap-2 rounded-[10px] border border-[oklch(76%_0.17_151/0.3)] bg-[oklch(76%_0.17_151/0.1)] px-3 py-2 text-xs text-green"
+          role="status"
+          aria-live="polite"
+        >
+          <CheckIcon size={16} weight="bold" />
+          <span className="min-w-0 wrap-anywhere">{notice}</span>
+        </div>
+      )}
+      <header className="grid min-w-0 items-center gap-3 border-b border-line pb-3.5 lg:grid-cols-[minmax(0,1fr)_auto]">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 text-[13px] font-bold text-text-secondary">
-            <UsersThreeIcon size={16} weight="duotone" /> Группы
-          </div>
-          <h1 className="mt-2 mb-1.5 max-w-full wrap-anywhere text-[clamp(28px,4vw,42px)] font-bold leading-[1.02] tracking-[-0.04em]">
-            Наряды и повторяемые назначения
+          <h1 className="m-0 max-w-full wrap-anywhere text-[clamp(24px,3vw,34px)] font-bold leading-[1.06] tracking-[-0.03em]">
+            Распределение по группам
           </h1>
-          <p className="m-0 max-w-[68ch] wrap-anywhere text-sm leading-normal text-text-secondary">
-            Сегодня, неделя, правила ротации, исключения и ручные замены в одном
-            рабочем экране.
-          </p>
         </div>
         <div
-          className="grid min-w-0 grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3"
+          className="grid min-w-0 grid-cols-3 divide-x divide-line"
+          role="group"
           aria-label="Сводка групп"
         >
-          <SummaryCard label="Сегодня" value={assignedToday} hint="назначено" />
+          <SummaryCard label="Назначено сегодня" value={assignedToday} />
           <SummaryCard
-            label="Неделя"
+            label="Назначений за неделю"
             value={weekAssignments}
-            hint="назначений"
           />
           <SummaryCard
-            label="Конфликты"
+            label="Пересечения сегодня"
             value={totalConflicts}
-            hint="проверить"
             tone={totalConflicts > 0 ? "warn" : "ok"}
           />
         </div>
@@ -349,29 +422,60 @@ export function GroupsApp({
 
       {error && (
         <div
-          className="flex min-w-0 items-center gap-2 wrap-anywhere rounded-[14px] border border-[oklch(78%_0.16_74/0.35)] bg-[oklch(78%_0.16_74/0.1)] px-3 py-2.5 text-[13px] text-amber"
+          className="grid min-w-0 gap-2 rounded-[10px] border border-[oklch(78%_0.16_74/0.35)] bg-[oklch(78%_0.16_74/0.1)] p-3 text-amber sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center"
           role="alert"
         >
           <WarningIcon size={18} />
-          {error}
+          <div className="min-w-0">
+            <strong className="block text-sm text-text-primary">Действие не завершено</strong>
+            <span className="block wrap-anywhere text-xs">{error}</span>
+          </div>
+          <button
+            type="button"
+            className="inline-flex min-h-8.5 min-w-0 items-center justify-center gap-1.5 rounded-xl border border-[oklch(78%_0.16_74/0.42)] bg-[oklch(100%_0_0/0.045)] px-2.5 text-xs font-extrabold text-text-primary transition-[border-color,background,color] duration-200 hover:border-amber hover:bg-[oklch(78%_0.16_74/0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan disabled:cursor-not-allowed"
+            onClick={() => void refresh(true)}
+            disabled={isBusy || isRefreshing}
+          >
+            <ArrowClockwiseIcon size={15} className={isRefreshing ? "animate-spin" : ""} />
+            {isRefreshing ? "Обновляем" : "Обновить данные"}
+          </button>
+        </div>
+      )}
+      {isLiveRefreshUnavailable && !error && (
+        <div
+          className="grid min-w-0 gap-2 rounded-[10px] border border-line bg-bg-panel/70 p-3 text-xs text-text-secondary sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+          role="status"
+        >
+          <span className="min-w-0 wrap-anywhere">
+            Автообновление временно недоступно. Данные можно обновить вручную.
+          </span>
+          <button
+            type="button"
+            className="inline-flex min-h-8.5 min-w-0 items-center justify-center gap-1.5 rounded-xl border border-line bg-[oklch(100%_0_0/0.045)] px-2.5 text-xs font-extrabold text-text-primary transition-[border-color,background,color] duration-200 hover:border-accent-line hover:bg-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan disabled:cursor-not-allowed"
+            onClick={() => void refresh(true)}
+            disabled={isBusy || isRefreshing}
+          >
+            <ArrowClockwiseIcon size={15} className={isRefreshing ? "animate-spin" : ""} />
+            {isRefreshing ? "Обновляем" : "Обновить"}
+          </button>
         </div>
       )}
       {!canWrite && (
         <div
-          className="flex min-w-0 items-center gap-2 wrap-anywhere rounded-[14px] border border-[oklch(78%_0.16_74/0.35)] bg-[oklch(78%_0.16_74/0.1)] px-3 py-2.5 text-[13px] text-amber"
+          className="flex min-w-0 items-center gap-2 wrap-anywhere rounded-[10px] border border-[oklch(78%_0.16_74/0.35)] bg-[oklch(78%_0.16_74/0.1)] px-3 py-2 text-xs text-amber"
           role="status"
         >
-          Доступ только для просмотра.
+          Режим просмотра — создавать и изменять назначения нельзя.
         </div>
       )}
 
       <div className="grid min-w-0 items-start gap-3.5 lg:grid-cols-[minmax(210px,250px)_minmax(0,1fr)] xl:grid-cols-[minmax(210px,250px)_minmax(0,1fr)_minmax(260px,310px)]">
         <aside
-          className="grid min-w-0 gap-3 rounded-[20px] border border-line bg-bg-panel p-3 shadow-(--shadow)"
+          className="grid min-w-0 gap-2.5 p-0"
           aria-label="Список групп"
         >
           <div className="flex items-center justify-between gap-2 text-[13px] font-bold text-text-secondary">
-            <span>Активные группы</span>
+            <span>Группы</span>
             {canWrite && (
               <button
                 type="button"
@@ -396,7 +500,7 @@ export function GroupsApp({
           <div className="grid gap-2">
             {visibleGroups.length === 0 ? (
               <p className="overflow-hidden text-ellipsis whitespace-nowrap text-xs text-text-muted">
-                Группы не найдены.
+                По этому запросу группы не найдены. Измените поиск.
               </p>
             ) : (
               visibleGroups.map((group) => {
@@ -408,10 +512,12 @@ export function GroupsApp({
                   <button
                     key={group.id}
                     type="button"
-                    className={`grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 rounded-2xl border border-(--tone-line) bg-[oklch(100%_0_0/0.035)] p-2.5 text-left text-text-primary transition-[border-color,background,transform] duration-200 hover:border-accent-line hover:bg-[oklch(100%_0_0/0.065)] cursor-pointer active:translate-y-px ${activeGroupId === group.id ? "border-(--tone-line) bg-(--tone-soft)" : ""} ${colorTokenClass(item?.template.colorToken ?? "neutral")}`}
+                    className={`grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 rounded-xl border border-(--tone-line) bg-[oklch(100%_0_0/0.035)] px-2.5 py-2 text-left text-text-primary transition-[border-color,background,transform] duration-200 hover:border-accent-line hover:bg-[oklch(100%_0_0/0.065)] cursor-pointer active:translate-y-px ${activeGroupId === group.id ? "border-(--tone-line) bg-(--tone-soft)" : ""} ${colorTokenClass(item?.template.colorToken ?? "neutral")}`}
                     onClick={() => setActiveGroupId(group.id)}
+                    aria-pressed={activeGroupId === group.id}
+                    title={group.name}
                   >
-                    <span className="grid h-9.5 w-9.5 flex-none place-items-center rounded-[14px] bg-(--tone-soft) text-(--tone)">
+                    <span className="grid h-9 w-9 flex-none place-items-center rounded-xl bg-(--tone-soft) text-(--tone)">
                       <Icon size={20} weight="duotone" />
                     </span>
                     <span className="grid min-w-0 gap-0.5">
@@ -435,23 +541,25 @@ export function GroupsApp({
           </div>
         </aside>
 
-        <main className="grid min-w-0 gap-3 rounded-[20px] border border-line bg-bg-panel p-3 shadow-(--shadow)">
+        <main className="grid min-w-0 gap-3">
           {activeSnapshot && selectedDay ? (
             <>
               <GroupToolbar
                 item={activeSnapshot}
-                selectedDate={selectedDate}
+                selectedDate={effectiveSelectedDate}
                 onRotate={() =>
-                  run(
-                    () => rotateGroup(activeSnapshot.group.id, selectedDate),
-                    "Ротация не выполнена",
-                  )
+                run(
+                  () => rotateGroup(activeSnapshot.group.id, effectiveSelectedDate),
+                  "Ротация не выполнена",
+                  `Ротация запущена на ${formatDateLabel(effectiveSelectedDate)}.`,
+                )
                 }
                 onAssign={() => setAssignOpen(true)}
                 onToggle={() =>
                   run(() =>
                     updateGroup({
                       id: activeSnapshot.group.id,
+                      expectedUpdatedAt: activeSnapshot.group.updatedAt,
                       enabled: !activeSnapshot.group.enabled,
                     }),
                   )
@@ -460,20 +568,20 @@ export function GroupsApp({
               />
               <WeekStrip
                 item={activeSnapshot}
-                selectedDate={selectedDate}
+                selectedDate={effectiveSelectedDate}
                 onSelect={setSelectedDate}
               />
-              <section className="grid gap-3 rounded-[18px] border border-line bg-[oklch(100%_0_0/0.03)] p-3">
+              <section className="grid gap-3 border-t border-line pt-3">
                 <div className="grid min-w-0 gap-2.5 min-[560px]:flex min-[560px]:items-center min-[560px]:justify-between">
                   <div className="min-w-0">
                     <h2 className="m-0 overflow-hidden text-ellipsis whitespace-nowrap text-lg font-bold tracking-[-0.02em]">
-                      {formatDateLabel(selectedDate)} ·{" "}
+                      {formatDateLabel(effectiveSelectedDate)} ·{" "}
                       {DAY_NAMES[selectedDay.dayOfWeek]}
                     </h2>
                     <p className="m-0 mt-0.75 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-text-muted">
                       {selectedDay.isActive
-                        ? "Группа работает по расписанию"
-                        : "День выключен в правилах группы"}
+                        ? "На эту дату группа работает по расписанию"
+                        : "Этот день выключен в правилах группы"}
                     </p>
                   </div>
                   <button
@@ -498,7 +606,7 @@ export function GroupsApp({
                 {selectedDay.assignments.length === 0 ? (
                   <EmptyState
                     title="Назначений нет"
-                    text="Включите день в правилах, запустите ротацию или назначьте человека вручную."
+                    text="Запустите ротацию или назначьте человека вручную."
                   />
                 ) : visibleAssignments.length === 0 ? (
                   <EmptyState
@@ -506,13 +614,13 @@ export function GroupsApp({
                     text="Измените поиск или сортировку назначений."
                   />
                 ) : (
-                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">
+                  <div className="grid grid-cols-1 gap-0 sm:grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">
                     {visibleAssignments.map((assignment) => (
                       <article
                         key={assignment.id}
-                        className={`grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 rounded-2xl border ${assignment.conflicts.length > 0 ? "border-[oklch(78%_0.16_74/0.45)]" : "border-line"} bg-[oklch(100%_0_0/0.04)] p-2.5 sm:grid-cols-[auto_minmax(0,1fr)_auto]`}
+                        className={`grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 border-b border-line py-2.5 last:border-b-0 sm:grid-cols-[auto_minmax(0,1fr)_auto] ${assignment.conflicts.length > 0 ? "rounded-[10px] border border-[oklch(78%_0.16_74/0.45)] bg-[oklch(78%_0.16_74/0.08)] px-2.5" : ""}`}
                       >
-                        <div className="grid h-9.5 w-9.5 flex-none place-items-center rounded-full bg-accent-soft text-xs font-extrabold text-accent">
+                        <div className="grid h-8.5 w-8.5 flex-none place-items-center rounded-full bg-accent-soft text-xs font-extrabold text-accent">
                           {assignment.personName
                             ? getInitials(assignment.personName)
                             : "?"}
@@ -532,7 +640,10 @@ export function GroupsApp({
                             </span>
                           )}
                           {assignment.conflicts.length > 0 && (
-                            <em className="flex min-w-0 items-center gap-1.25 overflow-hidden text-ellipsis whitespace-nowrap text-xs not-italic text-amber">
+                            <em
+                              className="flex min-w-0 items-start gap-1.25 wrap-anywhere text-xs not-italic text-amber"
+                              title={assignment.conflicts.map((item) => item.groupName).join(", ")}
+                            >
                               <ShieldWarningIcon size={15} /> Уже есть в:{" "}
                               {assignment.conflicts
                                 .map((item) => item.groupName)
@@ -558,7 +669,7 @@ export function GroupsApp({
                               )
                             }
                             disabled={isBusy || !canWrite}
-                            aria-label="Снять назначение"
+                            aria-label={`Снять назначение: ${assignment.personName ?? assignment.personId}`}
                           >
                             <XIcon size={16} />
                           </button>
@@ -572,7 +683,7 @@ export function GroupsApp({
           ) : (
             <EmptyState
               title="Группы не созданы"
-              text="Создайте первую группу из шаблона, чтобы включить ротацию."
+              text="Создайте группу из шаблона — после этого можно запускать ротацию."
             />
           )}
         </main>
@@ -586,25 +697,34 @@ export function GroupsApp({
             onSave={(payload) =>
               run(
                 () =>
-                  updateRule({ groupId: activeSnapshot.group.id, ...payload }),
-                "Правила не сохранены",
-              )
+                  updateRule({
+                    groupId: activeSnapshot.group.id,
+                    expectedUpdatedAt: activeSnapshot.group.updatedAt,
+                    ...payload,
+                  }),
+                  "Правила не сохранены",
+                  "Правила группы сохранены.",
+                )
             }
             onRename={(payload) =>
               run(
-                () => updateGroup({ id: activeSnapshot.group.id, ...payload }),
-                "Группа не сохранена",
-              )
+                () =>
+                  updateGroup({
+                    id: activeSnapshot.group.id,
+                    expectedUpdatedAt: activeSnapshot.group.updatedAt,
+                    ...payload,
+                  }),
+                  "Группа не сохранена",
+                  "Описание группы сохранено.",
+                )
             }
-            onDelete={() => {
-              if (!window.confirm("Удалить группу и все её назначения?")) {
-                return Promise.resolve(null);
-              }
-              return run(
+            onDelete={() =>
+              void run(
                 () => deleteGroup(activeSnapshot.group.id),
                 "Группа не удалена",
-              );
-            }}
+                "Группа удалена.",
+              )
+            }
           />
         )}
       </div>
@@ -634,6 +754,7 @@ export function GroupsApp({
         <PersonPickerPanel
           title="Назначить вручную"
           people={selectedAvailablePeople}
+          selectedDate={effectiveSelectedDate}
           onClose={() => {
             setAssignOpen(false);
             setPendingConflict(null);
@@ -678,27 +799,22 @@ export function GroupsApp({
 function SummaryCard({
   label,
   value,
-  hint,
   tone,
 }: {
   label: string;
   value: number;
-  hint: string;
   tone?: "ok" | "warn";
 }) {
   return (
-    <div className="min-w-0 rounded-2xl border border-line bg-[oklch(100%_0_0/0.045)] p-3">
-      <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-bold text-text-muted">
+    <div className="min-w-0 px-3 py-0.5 first:pl-0 last:pr-0">
+      <span className="block min-h-[2.4em] text-[11px] leading-tight font-bold text-text-muted">
         {label}
       </span>
       <strong
-        className={`my-0.5 block overflow-hidden text-ellipsis font-mono text-2xl leading-none ${tone === "ok" ? "text-green" : tone === "warn" ? "text-amber" : "text-text-primary"}`}
+        className={`my-0.5 block overflow-hidden text-ellipsis font-mono text-xl leading-none ${tone === "ok" ? "text-green" : tone === "warn" ? "text-amber" : "text-text-primary"}`}
       >
         {value}
       </strong>
-      <small className="block overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-bold text-text-muted">
-        {hint}
-      </small>
     </div>
   );
 }
@@ -722,20 +838,19 @@ function GroupToolbar({
     iconMap[item.template.icon as keyof typeof iconMap] ?? ClipboardTextIcon;
   return (
     <div
-      className={`grid min-w-0 items-center gap-3 rounded-[18px] border border-(--tone-line) bg-[linear-gradient(135deg,var(--tone-soft),oklch(100%_0_0/0.035))] p-3 min-[1800px]:grid-cols-[minmax(0,1fr)_auto] ${colorTokenClass(item.template.colorToken)}`}
+      className={`grid min-w-0 items-center gap-3 rounded-[16px] border border-(--tone-line) bg-bg-panel p-3 min-[1800px]:grid-cols-[minmax(0,1fr)_auto] ${colorTokenClass(item.template.colorToken)}`}
     >
       <div className="flex min-w-0 items-center gap-2.5">
         <span className="grid h-9.5 w-9.5 flex-none place-items-center rounded-[14px] bg-(--tone-soft) text-(--tone)">
           <Icon size={24} weight="duotone" />
         </span>
         <div className="min-w-0">
-          <h2 className="m-0 overflow-hidden text-ellipsis whitespace-nowrap text-lg font-bold tracking-[-0.02em]">
+          <h2 className="m-0 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-lg font-bold tracking-[-0.02em]" title={item.group.name}>
             {item.group.name}
           </h2>
           <p className="m-0 mt-0.75 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-text-muted">
-            {item.group.notes || item.template.name} · {item.rule.peoplePerDay}{" "}
-            чел. в день · {priorityModeLabels[item.rule.priorityMode]} ·{" "}
-            {item.candidatePlatoons.length} подразделений
+            {item.template.name} · {item.rule.peoplePerDay} чел. в день ·{" "}
+            {priorityModeLabels[item.rule.priorityMode]}
           </p>
         </div>
       </div>
@@ -746,7 +861,7 @@ function GroupToolbar({
           onClick={onToggle}
           disabled={disabled}
         >
-          {item.group.enabled ? "Выключить" : "Включить"}
+          {item.group.enabled ? "Отключить группу" : "Включить группу"}
         </button>
         <button
           type="button"
@@ -754,7 +869,7 @@ function GroupToolbar({
           onClick={onRotate}
           disabled={disabled}
         >
-          <CalendarBlankIcon size={17} /> Ротация{" "}
+          <CalendarBlankIcon size={17} /> Запустить ротацию{" "}
           {formatDateLabel(selectedDate)}
         </button>
         <button
@@ -781,32 +896,38 @@ function WeekStrip({
 }) {
   return (
     <div
-      className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7"
+      className="min-w-0 overflow-x-auto rounded-xl border border-line bg-bg-panel/45"
       aria-label="План на неделю"
     >
-      {item.week.map((day) => (
-        <button
-          key={day.date}
-          type="button"
-          className={`relative grid min-w-0 gap-0.5 rounded-[14px] border p-2.5 text-left text-text-primary transition-[border-color,background,transform] duration-200 hover:border-accent-line hover:bg-[oklch(100%_0_0/0.065)] cursor-pointer active:translate-y-px ${selectedDate === day.date ? "border-accent-line bg-accent-soft" : "border-line bg-[oklch(100%_0_0/0.035)]"} ${!day.isActive ? "opacity-[0.62]" : ""}`}
-          onClick={() => onSelect(day.date)}
-        >
-          <span className="text-[11px] font-bold text-text-muted">
-            {formatDayLabel(day.dayOfWeek)}
-          </span>
-          <strong className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px]">
-            {formatDateLabel(day.date)}
-          </strong>
-          <small className="text-[11px] font-bold text-text-muted">
-            {day.assignments.length}/{item.rule.peoplePerDay}
-          </small>
-          {day.conflictsCount > 0 && (
-            <em className="absolute right-1.5 top-1.5 min-w-4.5 rounded-full bg-amber text-center font-mono text-[10px] font-black not-italic text-[oklch(15%_0.035_286)]">
-              {day.conflictsCount}
-            </em>
-          )}
-        </button>
-      ))}
+      <div className="grid min-w-[560px] grid-cols-7 sm:min-w-0 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        {item.week.map((day) => (
+          <button
+            key={day.date}
+            type="button"
+            className={`relative grid min-w-0 gap-0.5 border-0 border-r border-line p-2.5 text-left text-text-primary transition-[background,color] duration-200 last:border-r-0 hover:bg-[oklch(100%_0_0/0.065)] focus-visible:z-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan cursor-pointer ${selectedDate === day.date ? "bg-accent-soft" : "bg-transparent"} ${!day.isActive ? "bg-[oklch(100%_0_0/0.025)] opacity-[0.72]" : ""}`}
+            onClick={() => onSelect(day.date)}
+            aria-pressed={selectedDate === day.date}
+            aria-label={`${formatDayLabel(day.dayOfWeek)}, ${formatDateLabel(day.date)}${day.isActive ? "" : ", день выключен"}`}
+          >
+            <span className="text-[11px] font-bold text-text-muted">
+              {formatDayLabel(day.dayOfWeek)}
+            </span>
+            <strong className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px]">
+              {formatDateLabel(day.date)}
+            </strong>
+            <small className="text-[11px] font-bold text-text-muted">
+              {day.isActive
+                ? `${day.assignments.length}/${item.rule.peoplePerDay}`
+                : "Выкл."}
+            </small>
+            {day.conflictsCount > 0 && (
+              <em className="absolute right-1.5 top-1.5 min-w-4.5 rounded-full bg-amber text-center font-mono text-[10px] font-black not-italic text-[oklch(15%_0.035_286)]">
+                {day.conflictsCount}
+              </em>
+            )}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -830,10 +951,11 @@ function SettingsPanel({
     priorityMode: GroupPriorityMode;
   }) => Promise<unknown>;
   onRename: (payload: { name: string; notes: string }) => Promise<unknown>;
-  onDelete: () => Promise<unknown>;
+  onDelete: () => void;
 }) {
   const [name, setName] = useState(item.group.name);
   const [notes, setNotes] = useState(item.group.notes);
+  const [nameTouched, setNameTouched] = useState(false);
   const [peoplePerDay, setPeoplePerDay] = useState(item.rule.peoplePerDay);
   const [autoRotate, setAutoRotate] = useState(item.rule.autoRotate);
   const [activeDays, setActiveDays] = useState(item.rule.activeDays);
@@ -858,15 +980,17 @@ function SettingsPanel({
     );
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const [deleteRequested, setDeleteRequested] = useState(false);
   const toggleSection = (key: string) =>
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  const nameError = nameTouched && !name.trim() ? "Введите название группы." : null;
 
   return (
     <aside
-      className="grid min-w-0 gap-3 rounded-[20px] border border-line bg-bg-panel p-3 shadow-(--shadow) lg:col-span-2 xl:col-span-1"
+      className="grid min-w-0 gap-0 rounded-[16px] border border-line bg-bg-panel/70 p-3 lg:col-span-2 xl:col-span-1"
       aria-label="Настройки группы"
     >
-      <div className="flex items-center gap-2 text-[13px] font-bold text-text-secondary">
+      <div className="flex items-center gap-2 pb-2.5 text-[13px] font-bold text-text-secondary">
         <GearSixIcon size={18} /> Настройки
       </div>
 
@@ -880,20 +1004,32 @@ function SettingsPanel({
             Название
           </span>
           <input
-            className="w-full min-w-0 rounded-xl border border-line bg-[oklch(100%_0_0/0.045)] px-2.75 py-2.5 text-text-primary outline-none focus:border-cyan focus:ring-2 focus:ring-[oklch(77%_0.14_191/0.1)]"
+            className="w-full min-w-0 rounded-xl border border-line bg-[oklch(100%_0_0/0.045)] px-2.75 py-2.5 text-base text-text-primary outline-none focus:border-cyan focus:ring-2 focus:ring-[oklch(77%_0.14_191/0.1)]"
             value={name}
             onChange={(event) => setName(event.target.value)}
+            onBlur={() => setNameTouched(true)}
+            maxLength={GROUP_NAME_MAX_LENGTH}
+            required
+            aria-invalid={nameError ? true : undefined}
+            aria-describedby="group-settings-name-hint"
           />
+          <small
+            id="group-settings-name-hint"
+            className={nameError ? "text-xs text-red" : "text-[11px] text-text-muted"}
+          >
+            {nameError ?? `До ${GROUP_NAME_MAX_LENGTH} символов.`}
+          </small>
         </label>
         <label className="grid min-w-0 gap-1.75">
           <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-extrabold text-text-secondary">
             Заметка
           </span>
           <textarea
-            className="w-full min-w-0 rounded-xl border border-line bg-[oklch(100%_0_0/0.045)] px-2.75 py-2.5 text-text-primary outline-none focus:border-cyan focus:ring-2 focus:ring-[oklch(77%_0.14_191/0.1)]"
+            className="w-full min-w-0 rounded-xl border border-line bg-[oklch(100%_0_0/0.045)] px-2.75 py-2.5 text-base text-text-primary outline-none focus:border-cyan focus:ring-2 focus:ring-[oklch(77%_0.14_191/0.1)]"
             rows={3}
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
+            maxLength={GROUP_NOTES_MAX_LENGTH}
           />
         </label>
         <button
@@ -913,13 +1049,15 @@ function SettingsPanel({
       >
         <div className="grid min-w-0 gap-1.75">
           <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-extrabold text-text-secondary">
-            Людей в день
+            Сколько человек назначать в день
           </span>
           <div className="grid grid-cols-[38px_1fr_38px] overflow-hidden rounded-xl border border-line">
             <button
               type="button"
-              className="cursor-pointer border-0 bg-transparent text-text-primary"
+              className="cursor-pointer border-0 bg-transparent text-text-primary disabled:cursor-not-allowed disabled:opacity-55"
               onClick={() => setPeoplePerDay((value) => Math.max(1, value - 1))}
+              disabled={isBusy || peoplePerDay <= 1}
+              aria-label="Уменьшить количество людей в день"
             >
               -
             </button>
@@ -928,10 +1066,12 @@ function SettingsPanel({
             </strong>
             <button
               type="button"
-              className="cursor-pointer border-0 bg-transparent text-text-primary"
+              className="cursor-pointer border-0 bg-transparent text-text-primary disabled:cursor-not-allowed disabled:opacity-55"
               onClick={() =>
                 setPeoplePerDay((value) => Math.min(40, value + 1))
               }
+              disabled={isBusy || peoplePerDay >= 40}
+              aria-label="Увеличить количество людей в день"
             >
               +
             </button>
@@ -939,15 +1079,15 @@ function SettingsPanel({
         </div>
         <StyledCheckbox
           checked={autoRotate}
-          label="Авто-ротация"
+          label="Автоматически заполнять дни"
           onChange={setAutoRotate}
         />
         <div className="grid min-w-0 gap-1.75">
           <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-extrabold text-text-secondary">
-            Способ автоназначения
+            Кого назначать автоматически
           </span>
           <SelectField
-            ariaLabel="Способ автоназначения"
+            ariaLabel="Кого назначать автоматически"
             value={priorityMode}
             options={priorityModeOptions}
             onChange={(value) => setPriorityMode(value as GroupPriorityMode)}
@@ -960,7 +1100,7 @@ function SettingsPanel({
         </div>
         <div className="grid min-w-0 gap-1.75">
           <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-extrabold text-text-secondary">
-            Активные дни
+            Дни работы группы
           </span>
           <div className="flex flex-wrap gap-1.75">
             {[0, 1, 2, 3, 4, 5, 6].map((day) => (
@@ -977,7 +1117,7 @@ function SettingsPanel({
         </div>
         <div className="grid min-w-0 gap-1.75">
           <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-extrabold text-text-secondary">
-            Кандидаты из подразделений
+            Кого брать в ротацию
           </span>
           <div className="flex flex-wrap gap-1.75">
             {platoons.map((platoon) => (
@@ -992,7 +1132,7 @@ function SettingsPanel({
           </div>
           {enabledPlatoons.length === 0 && (
             <small className="text-[11px] text-text-muted">
-              Пусто значит все подразделения.
+              Если ничего не выбрано — берём из всех подразделений.
             </small>
           )}
         </div>
@@ -1019,14 +1159,46 @@ function SettingsPanel({
         open={!!openSections["danger"]}
         onToggle={() => toggleSection("danger")}
       >
-        <button
-          type="button"
-          className="inline-flex min-h-9.5 w-full max-w-full min-w-0 items-center justify-center gap-1.75 overflow-hidden rounded-xl border border-[oklch(69%_0.18_28/0.35)] bg-[oklch(69%_0.18_28/0.12)] px-3.25 text-center text-[13px] font-extrabold text-red transition-[background,border-color,transform] duration-200 cursor-pointer active:translate-y-px"
-          disabled={isBusy}
-          onClick={onDelete}
-        >
-          <TrashIcon size={16} /> Удалить группу
-        </button>
+        {deleteRequested ? (
+          <div
+            className="grid gap-2.5 rounded-[12px] border border-[oklch(69%_0.18_28/0.35)] bg-[oklch(69%_0.18_28/0.1)] p-2.5"
+            role="alert"
+          >
+            <div className="grid min-w-0 gap-1">
+              <strong className="text-sm text-text-primary">Удалить группу?</strong>
+              <span className="wrap-anywhere text-xs text-text-secondary">
+                Группа «{item.group.name}» и её назначения будут удалены без возможности отмены.
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                className="inline-flex min-h-9.5 min-w-0 items-center justify-center rounded-xl border border-line bg-[oklch(100%_0_0/0.045)] px-2 text-center text-xs font-extrabold text-text-primary transition-[background,border-color] duration-200 hover:border-line-strong hover:bg-[oklch(100%_0_0/0.08)]"
+                disabled={isBusy}
+                onClick={() => setDeleteRequested(false)}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="inline-flex min-h-9.5 min-w-0 items-center justify-center gap-1.5 rounded-xl border border-[oklch(69%_0.18_28/0.45)] bg-[oklch(69%_0.18_28/0.16)] px-2 text-center text-xs font-extrabold text-red transition-[background,border-color] duration-200 hover:border-red hover:bg-[oklch(69%_0.18_28/0.22)]"
+                disabled={isBusy}
+                onClick={onDelete}
+              >
+                <TrashIcon size={15} /> Удалить
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="inline-flex min-h-9.5 w-full max-w-full min-w-0 items-center justify-center gap-1.75 overflow-hidden rounded-xl border border-[oklch(69%_0.18_28/0.35)] bg-[oklch(69%_0.18_28/0.12)] px-3.25 text-center text-[13px] font-extrabold text-red transition-[background,border-color,transform] duration-200 hover:border-[oklch(69%_0.18_28/0.55)] hover:bg-[oklch(69%_0.18_28/0.18)] cursor-pointer active:translate-y-px"
+            disabled={isBusy}
+            onClick={() => setDeleteRequested(true)}
+          >
+            <TrashIcon size={16} /> Удалить группу
+          </button>
+        )}
       </CollapsibleSection>
     </aside>
   );
@@ -1051,64 +1223,88 @@ function CreateGroupPanel({
   const selected = templates.find((item) => item.id === templateId);
   const [name, setName] = useState(selected?.name ?? "");
   const [notes, setNotes] = useState("");
+  const [nameTouched, setNameTouched] = useState(false);
+  const nameError = nameTouched && !name.trim() ? "Введите название группы." : null;
 
   return (
     <Drawer title="Новая группа" onClose={onClose}>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {templates.map((template) => {
-          const Icon =
-            iconMap[template.icon as keyof typeof iconMap] ?? ClipboardTextIcon;
-          return (
-            <button
-              key={template.id}
-              type="button"
-              className={`grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 rounded-2xl border border-(--tone-line) bg-[oklch(100%_0_0/0.035)] p-2.5 text-left text-text-primary transition-[border-color,background,transform] duration-200 hover:border-accent-line hover:bg-[oklch(100%_0_0/0.065)] cursor-pointer active:translate-y-px ${templateId === template.id ? "border-(--tone-line) bg-(--tone-soft)" : ""} ${colorTokenClass(template.colorToken)}`}
-              onClick={() => {
-                setTemplateId(template.id);
-                setName(template.name);
-              }}
-              disabled={isBusy}
+      {templates.length === 0 ? (
+        <EmptyState
+          title="Нет шаблонов для группы"
+          text="Добавьте шаблон в справочниках, затем вернитесь к созданию группы."
+        />
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {templates.map((template) => {
+              const Icon =
+                iconMap[template.icon as keyof typeof iconMap] ?? ClipboardTextIcon;
+              return (
+                <button
+                  key={template.id}
+                  type="button"
+                  className={`grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 rounded-2xl border border-(--tone-line) bg-[oklch(100%_0_0/0.035)] p-2.5 text-left text-text-primary transition-[border-color,background,transform] duration-200 hover:border-accent-line hover:bg-[oklch(100%_0_0/0.065)] cursor-pointer active:translate-y-px ${templateId === template.id ? "border-(--tone-line) bg-(--tone-soft)" : ""} ${colorTokenClass(template.colorToken)}`}
+                  onClick={() => {
+                    setTemplateId(template.id);
+                    setName(template.name);
+                  }}
+                  disabled={isBusy}
+                  aria-pressed={templateId === template.id}
+                >
+                  <Icon size={22} weight="duotone" />
+                  <strong className="overflow-hidden text-ellipsis whitespace-nowrap text-sm">
+                    {template.name}
+                  </strong>
+                  <small className="col-start-2 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-text-muted">
+                    {template.defaultPeoplePerDay} чел.
+                  </small>
+                </button>
+              );
+            })}
+          </div>
+          <label className="grid min-w-0 gap-1.75">
+            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-extrabold text-text-secondary">
+              Название
+            </span>
+            <input
+              className="w-full min-w-0 rounded-xl border border-line bg-[oklch(100%_0_0/0.045)] px-2.75 py-2.5 text-base text-text-primary outline-none focus:border-cyan focus:ring-2 focus:ring-[oklch(77%_0.14_191/0.1)]"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              onBlur={() => setNameTouched(true)}
+              maxLength={GROUP_NAME_MAX_LENGTH}
+              required
+              aria-invalid={nameError ? true : undefined}
+              aria-describedby="create-group-name-hint"
+            />
+            <small
+              id="create-group-name-hint"
+              className={nameError ? "text-xs text-red" : "text-[11px] text-text-muted"}
             >
-              <Icon size={22} weight="duotone" />
-              <strong className="overflow-hidden text-ellipsis whitespace-nowrap text-sm">
-                {template.name}
-              </strong>
-              <small className="col-start-2 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-text-muted">
-                {template.defaultPeoplePerDay} чел.
-              </small>
-            </button>
-          );
-        })}
-      </div>
-      <label className="grid min-w-0 gap-1.75">
-        <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-extrabold text-text-secondary">
-          Название
-        </span>
-        <input
-          className="w-full min-w-0 rounded-xl border border-line bg-[oklch(100%_0_0/0.045)] px-2.75 py-2.5 text-text-primary outline-none focus:border-cyan focus:ring-2 focus:ring-[oklch(77%_0.14_191/0.1)]"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
-      </label>
-      <label className="grid min-w-0 gap-1.75">
-        <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-extrabold text-text-secondary">
-          Заметка
-        </span>
-        <textarea
-          className="w-full min-w-0 rounded-xl border border-line bg-[oklch(100%_0_0/0.045)] px-2.75 py-2.5 text-text-primary outline-none focus:border-cyan focus:ring-2 focus:ring-[oklch(77%_0.14_191/0.1)]"
-          rows={3}
-          value={notes}
-          onChange={(event) => setNotes(event.target.value)}
-        />
-      </label>
-      <button
-        type="button"
-        className="inline-flex min-h-9.5 w-full max-w-full min-w-0 items-center justify-center gap-1.75 overflow-hidden rounded-xl border border-accent-line bg-accent px-3.25 text-center text-[13px] font-extrabold text-[oklch(98%_0.01_286)] transition-[background,border-color,transform] duration-200 cursor-pointer active:translate-y-px"
-        disabled={isBusy || !name.trim() || !templateId}
-        onClick={() => onCreate({ name: name.trim(), templateId, notes })}
-      >
-        Создать
-      </button>
+              {nameError ?? `До ${GROUP_NAME_MAX_LENGTH} символов.`}
+            </small>
+          </label>
+          <label className="grid min-w-0 gap-1.75">
+            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-extrabold text-text-secondary">
+              Заметка
+            </span>
+            <textarea
+              className="w-full min-w-0 rounded-xl border border-line bg-[oklch(100%_0_0/0.045)] px-2.75 py-2.5 text-base text-text-primary outline-none focus:border-cyan focus:ring-2 focus:ring-[oklch(77%_0.14_191/0.1)]"
+              rows={3}
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              maxLength={GROUP_NOTES_MAX_LENGTH}
+            />
+          </label>
+          <button
+            type="button"
+            className="inline-flex min-h-9.5 w-full max-w-full min-w-0 items-center justify-center gap-1.75 overflow-hidden rounded-xl border border-accent-line bg-accent px-3.25 text-center text-[13px] font-extrabold text-[oklch(98%_0.01_286)] transition-[background,border-color,transform] duration-200 cursor-pointer active:translate-y-px"
+            disabled={isBusy || !name.trim() || !templateId}
+            onClick={() => onCreate({ name: name.trim(), templateId, notes })}
+          >
+            Создать
+          </button>
+        </>
+      )}
     </Drawer>
   );
 }
@@ -1117,6 +1313,7 @@ function PersonPickerPanel({
   title,
   people,
   pendingConflict,
+  selectedDate,
   isBusy,
   onClose,
   onPick,
@@ -1125,6 +1322,7 @@ function PersonPickerPanel({
   title: string;
   people: Person[];
   pendingConflict: PendingConflict;
+  selectedDate: string;
   onClose: () => void;
   onPick: (personId: string) => void;
   onConfirmConflict: () => void;
@@ -1152,6 +1350,9 @@ function PersonPickerPanel({
       ),
     [people, query, sort],
   );
+  const pendingPerson = pendingConflict
+    ? people.find((person) => person.id === pendingConflict.personId)
+    : null;
 
   return (
     <Drawer title={title} onClose={onClose}>
@@ -1166,33 +1367,38 @@ function PersonPickerPanel({
       />
       {pendingConflict && (
         <div
-          className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 rounded-[14px] border border-[oklch(78%_0.16_74/0.38)] bg-[oklch(78%_0.16_74/0.1)] p-2.5 text-amber"
+          className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 rounded-[14px] border border-[oklch(78%_0.16_74/0.38)] bg-[oklch(78%_0.16_74/0.1)] p-2.5 text-amber sm:grid-cols-[auto_minmax(0,1fr)_auto]"
           role="alert"
         >
           <WarningIcon size={18} />
-          <div>
-            <strong>Есть пересечение</strong>
-            <span>
-              {pendingConflict.conflicts
+          <div className="min-w-0">
+            <strong className="block">Назначение пересекается</strong>
+            <span className="block wrap-anywhere text-xs">
+              {pendingPerson ? `${abbreviateName(pendingPerson.name)} · ` : ""}
+              {formatDateLabel(selectedDate)}. Уже есть в: {pendingConflict.conflicts
                 .map((item) => item.groupName)
-                .join(", ")}
+                .join(", ")}.
             </span>
           </div>
           <button
             type="button"
-            className="inline-flex min-h-8.5 max-w-full min-w-0 items-center justify-center gap-1.75 overflow-hidden rounded-xl border border-accent-line bg-accent px-2.5 text-center text-[13px] font-extrabold text-[oklch(98%_0.01_286)] transition-[background,border-color,transform] duration-200 cursor-pointer active:translate-y-px"
+            className="col-span-full inline-flex min-h-8.5 max-w-full min-w-0 items-center justify-center gap-1.75 overflow-hidden rounded-xl border border-[oklch(78%_0.16_74/0.5)] bg-[oklch(78%_0.16_74/0.16)] px-2.5 text-center text-[13px] font-extrabold text-text-primary transition-[background,border-color,transform] duration-200 hover:border-amber hover:bg-[oklch(78%_0.16_74/0.22)] cursor-pointer active:translate-y-px sm:col-span-1"
             onClick={onConfirmConflict}
             disabled={isBusy}
           >
-            Назначить всё равно
+            Назначить с конфликтом
           </button>
         </div>
       )}
       <div className="grid gap-1.75">
         {filtered.length === 0 ? (
           <EmptyState
-            title="Никого не найдено"
-            text="Измените поиск или правила кандидатов."
+            title={people.length === 0 ? "Нет кандидатов на выбранную дату" : "Никого не найдено"}
+            text={
+              people.length === 0
+                ? "Проверьте исключения и правила группы или выберите другую дату."
+                : "Измените поиск или правила кандидатов."
+            }
           />
         ) : (
           filtered.map((person) => (
@@ -1298,9 +1504,7 @@ function ExclusionsPanel({
   ];
   const selectedPersonId = peopleOptions.some(
     (option) => option.value === personId,
-  )
-    ? personId
-    : (peopleOptions[0]?.value ?? "");
+  ) ? personId : "";
 
   return (
     <Drawer title="Исключения" onClose={onClose}>
@@ -1347,7 +1551,7 @@ function ExclusionsPanel({
                 className="inline-flex h-8.5 min-h-8.5 w-8.5 max-w-full min-w-0 items-center justify-center gap-1.75 overflow-hidden rounded-xl border border-line bg-[oklch(100%_0_0/0.04)] p-0 text-text-secondary transition-[background,border-color,transform] duration-200 hover:border-[oklch(69%_0.18_28/0.45)] hover:text-red cursor-pointer active:translate-y-px"
                 onClick={() => onInclude(exclusion.id)}
                 disabled={isBusy}
-                aria-label="Снять исключение"
+                aria-label={`Снять исключение: ${exclusion.personName ?? exclusion.personId}`}
               >
                 <XIcon size={16} />
               </button>
@@ -1362,6 +1566,7 @@ function ExclusionsPanel({
           value={selectedPersonId}
           options={peopleOptions}
           onChange={setPersonId}
+          placeholder="Выберите человека"
           searchPlaceholder="Поиск кого исключить"
         />
       </div>
@@ -1379,9 +1584,10 @@ function ExclusionsPanel({
           Причина
         </span>
         <input
-          className="w-full min-w-0 rounded-xl border border-line bg-[oklch(100%_0_0/0.045)] px-2.75 py-2.5 text-text-primary outline-none focus:border-cyan focus:ring-2 focus:ring-[oklch(77%_0.14_191/0.1)]"
+          className="w-full min-w-0 rounded-xl border border-line bg-[oklch(100%_0_0/0.045)] px-2.75 py-2.5 text-base text-text-primary outline-none focus:border-cyan focus:ring-2 focus:ring-[oklch(77%_0.14_191/0.1)]"
           value={reason}
           onChange={(event) => setReason(event.target.value)}
+          maxLength={EXCLUSION_REASON_MAX_LENGTH}
           placeholder="Например: медчасть, закреплён за другим нарядом"
         />
       </label>
@@ -1421,9 +1627,9 @@ function StyledCheckbox({
     <button
       type="button"
       className={cx(
-        "inline-flex min-h-10.5 max-w-full min-w-0 items-center justify-start gap-2.25 rounded-xl border border-line bg-[linear-gradient(180deg,oklch(100%_0_0/0.065),oklch(100%_0_0/0.035))] px-3 text-left text-[13px] font-bold text-text-secondary shadow-[inset_0_1px_0_oklch(100%_0_0/0.055)] transition-[border-color,background,color,box-shadow,transform] duration-200 hover:border-[oklch(77%_0.14_191/0.46)] hover:bg-[oklch(77%_0.14_191/0.1)] hover:text-text-primary focus-visible:border-[oklch(77%_0.14_191/0.46)] focus-visible:outline-none cursor-pointer active:translate-y-px",
+        "inline-flex min-h-10.5 max-w-full min-w-0 items-center justify-start gap-2.25 rounded-xl border border-line bg-[oklch(100%_0_0/0.04)] px-3 text-left text-[13px] font-bold text-text-secondary transition-[border-color,background,color,transform] duration-200 hover:border-[oklch(77%_0.14_191/0.46)] hover:bg-[oklch(77%_0.14_191/0.1)] hover:text-text-primary focus-visible:border-[oklch(77%_0.14_191/0.46)] focus-visible:outline-none cursor-pointer active:translate-y-px",
         checked &&
-          "border-accent-line bg-[linear-gradient(180deg,oklch(68%_0.19_302/0.2),oklch(68%_0.19_302/0.08))] text-text-primary",
+          "border-accent-line bg-accent-soft text-text-primary",
         compact && "min-h-8.5 rounded-full px-2.5 text-xs",
       )}
       role="checkbox"
@@ -1456,10 +1662,10 @@ function CollapsibleSection({
   children: ReactNode;
 }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-line">
+    <div className="overflow-hidden border-t border-line">
       <button
         type="button"
-        className="flex w-full items-center justify-between gap-3 border-0 bg-[oklch(100%_0_0/0.04)] px-3 py-2.5 text-left text-xs font-extrabold text-text-secondary transition-colors duration-150 hover:bg-[oklch(100%_0_0/0.07)]"
+        className="flex w-full items-center justify-between gap-3 border-0 bg-transparent px-0 py-3 text-left text-xs font-extrabold text-text-secondary transition-colors duration-150 hover:text-text-primary"
         onClick={onToggle}
         aria-expanded={open}
       >
@@ -1473,7 +1679,7 @@ function CollapsibleSection({
         />
       </button>
       <DisclosureContent open={open}>
-        <div className="grid gap-3 border-t border-line p-3">{children}</div>
+        <div className="grid gap-3 pb-3">{children}</div>
       </DisclosureContent>
     </div>
   );
@@ -1489,6 +1695,16 @@ function Drawer({
   onClose: () => void;
 }) {
   const panelRef = useDialogFocus(onClose);
+  const titleId = useId();
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
   return (
     <div
       className="fixed inset-0 z-90 flex justify-end bg-bg-overlay backdrop-blur-sm"
@@ -1499,11 +1715,11 @@ function Drawer({
         className="grid min-h-dvh w-[min(460px,100vw)] min-w-0 content-start gap-3.5 overflow-y-auto border-l border-line bg-[oklch(15%_0.038_286)] p-4 shadow-[-20px_0_60px_rgb(0_0_0/0.32)]"
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-labelledby={titleId}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex min-w-0 items-center justify-between gap-3">
-          <h2 className="m-0 overflow-hidden text-ellipsis whitespace-nowrap text-lg font-bold tracking-[-0.02em]">
+          <h2 id={titleId} className="m-0 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-lg font-bold tracking-[-0.02em]" title={title}>
             {title}
           </h2>
           <button

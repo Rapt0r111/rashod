@@ -46,6 +46,35 @@ describe("Critical UI regression contracts", () => {
     expect(app).toContain("onRetry={loadTasksSnapshot}");
   });
 
+  it("keeps roster summary metrics in the actionable operator bar", () => {
+    const app = read("src/features/roster/RosterApp.tsx");
+    const topBar = read("src/features/roster/components/top-bar.tsx");
+    const operatorBar = read("src/features/roster/components/operator-bar.tsx");
+
+    expect(app).toContain("<OperatorBar");
+    expect(topBar).not.toContain("SummaryChip");
+    expect(topBar).not.toContain("total: number");
+    expect(topBar).not.toContain("rota: number");
+    expect(operatorBar).toContain("<SearchSortControl");
+    expect(operatorBar).toContain("onLocationFilter");
+  });
+
+  it("keeps content surfaces flat while preserving overlay depth", () => {
+    const main = read("src/features/roster/components/main-content.tsx");
+    const people = read("src/features/roster/components/person-views.tsx");
+    const admin = read("src/features/roster/components/admin-panel.tsx");
+    const topBar = read("src/features/roster/components/top-bar.tsx");
+    const dialogs = read("src/features/roster/components/dialogs.tsx");
+
+    expect(main).not.toContain("shadow-(--shadow)");
+    expect(main).not.toContain("0_0_18px");
+    expect(people).not.toContain("shadow-(--shadow)");
+    expect(admin).not.toContain("shadow-(--shadow)");
+    expect(admin).not.toContain("0_8px_22px");
+    expect(topBar).not.toContain("shadow-[0_12px_36px");
+    expect(dialogs).toContain("shadow-[0_30px_90px");
+  });
+
   it("redirects expired task sessions and closes references without a back loop", () => {
     const tasksApi = read("src/features/tasks/api.ts");
     const references = read("src/features/roster/ReferencesApp.tsx");
@@ -73,7 +102,10 @@ describe("Critical UI regression contracts", () => {
     const groups = read("src/features/groups/GroupsApp.tsx");
     const errorBoundary = read("src/app/error.tsx");
 
-    expect(groups).toContain('window.confirm("Удалить группу и все её назначения?")');
+    expect(groups).toContain("Удалить группу?");
+    expect(groups).toContain("без возможности отмены");
+    expect(groups).toContain("Отмена");
+    expect(groups).not.toContain("window.confirm");
     expect(errorBoundary).toContain('"use client"');
     expect(errorBoundary).toContain("unstable_retry");
     expect(errorBoundary).toContain('role="alert"');

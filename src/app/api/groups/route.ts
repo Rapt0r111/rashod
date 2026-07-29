@@ -19,6 +19,7 @@ const createSchema = z.object({
 });
 const updateSchema = z.object({
   id: idString,
+  expectedUpdatedAt: z.number().int().nonnegative().optional(),
   name: shortText(120).optional(),
   templateId: idString.optional(),
   notes: optionalText(1_000),
