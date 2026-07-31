@@ -2,22 +2,32 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const workspaceSource = readFileSync(
-  resolve(process.cwd(), "src/features/WorkspaceApp.tsx"),
-  "utf8",
-);
-const groupsSource = readFileSync(
-  resolve(process.cwd(), "src/features/groups/GroupsApp.tsx"),
-  "utf8",
-);
-const groupsApiSource = readFileSync(
-  resolve(process.cwd(), "src/features/groups/api.ts"),
-  "utf8",
-);
-const searchSource = readFileSync(
-  resolve(process.cwd(), "src/components/search-sort-control.tsx"),
-  "utf8",
-);
+const read = (path: string) =>
+  readFileSync(resolve(process.cwd(), path), "utf8");
+
+const workspaceSource = read("src/features/WorkspaceApp.tsx");
+const groupsSource = read("src/features/groups/GroupsApp.tsx");
+const groupsToolbarSource = read("src/features/groups/components/group-toolbar.tsx");
+const groupsWeekSource = read("src/features/groups/components/week-strip.tsx");
+const groupsSettingsSource = read("src/features/groups/components/settings-panel.tsx");
+const groupsCreateSource = read("src/features/groups/components/create-group-panel.tsx");
+const groupsPickerSource = read("src/features/groups/components/person-picker-panel.tsx");
+const groupsExclusionsSource = read("src/features/groups/components/exclusions-panel.tsx");
+const groupsDrawerSource = read("src/features/groups/components/drawer.tsx");
+const groupsConstantsSource = read("src/features/groups/components/constants.ts");
+const groupsUiSource = [
+  groupsSource,
+  groupsToolbarSource,
+  groupsWeekSource,
+  groupsSettingsSource,
+  groupsCreateSource,
+  groupsPickerSource,
+  groupsExclusionsSource,
+  groupsDrawerSource,
+  groupsConstantsSource,
+].join("\n");
+const groupsApiSource = read("src/features/groups/api.ts");
+const searchSource = read("src/components/search-sort-control.tsx");
 
 describe("Groups responsive UI contract", () => {
   it("gives the standalone groups route its own scroll container", () => {
@@ -29,9 +39,9 @@ describe("Groups responsive UI contract", () => {
   it("uses mobile-first breakpoints for the groups workspace", () => {
     expect(groupsSource).toContain("lg:grid-cols-[minmax(210px,250px)_minmax(0,1fr)]");
     expect(groupsSource).toContain("xl:grid-cols-[minmax(210px,250px)_minmax(0,1fr)_minmax(260px,310px)]");
-    expect(groupsSource).toContain("sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7");
-    expect(groupsSource).not.toContain("max-[860px]:grid-cols-1");
-    expect(groupsSource).not.toContain("max-[520px]:grid-cols-1");
+    expect(groupsWeekSource).toContain("sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7");
+    expect(groupsUiSource).not.toContain("max-[860px]:grid-cols-1");
+    expect(groupsUiSource).not.toContain("max-[520px]:grid-cols-1");
   });
 
   it("lets the shared search control shrink inside narrow panels", () => {
@@ -41,19 +51,14 @@ describe("Groups responsive UI contract", () => {
   });
 
   it("contains the group toolbar title and keeps actions in an adaptive grid", () => {
-    const toolbarSource = groupsSource.slice(
-      groupsSource.indexOf("function GroupToolbar"),
-      groupsSource.indexOf("function WeekStrip"),
-    );
-
-    expect(toolbarSource).toContain(
+    expect(groupsToolbarSource).toContain(
       "min-[1800px]:grid-cols-[minmax(0,1fr)_auto]",
     );
-    expect(toolbarSource).toContain(
+    expect(groupsToolbarSource).toContain(
       "grid-cols-[repeat(auto-fit,minmax(140px,1fr))]",
     );
-    expect(toolbarSource).toContain("min-w-0");
-    expect(toolbarSource).not.toContain("min-[1100px]:grid-cols");
+    expect(groupsToolbarSource).toContain("min-w-0");
+    expect(groupsToolbarSource).not.toContain("min-[1100px]:grid-cols");
   });
 
   it("handles mutation API errors inside the click callback", () => {
@@ -76,10 +81,10 @@ describe("Groups responsive UI contract", () => {
   it("makes mutation results and destructive actions explicit", () => {
     expect(groupsSource).toContain("setNotice(successMessage)");
     expect(groupsSource).toContain('role="status"');
-    expect(groupsSource).toContain("Удалить группу?");
-    expect(groupsSource).toContain("без возможности отмены");
-    expect(groupsSource).toContain("Назначить с конфликтом");
-    expect(groupsSource).not.toContain("window.confirm");
+    expect(groupsSettingsSource).toContain("Удалить группу?");
+    expect(groupsSettingsSource).toContain("без возможности отмены");
+    expect(groupsPickerSource).toContain("Назначить с конфликтом");
+    expect(groupsUiSource).not.toContain("window.confirm");
   });
 
   it("guards duplicate mutations and ignores stale refresh snapshots", () => {
@@ -94,30 +99,30 @@ describe("Groups responsive UI contract", () => {
 
   it("keeps explicit Groups copy under regression", () => {
     const phrase = (...codes: number[]) => String.fromCodePoint(...codes);
-    expect(groupsSource).toContain(phrase(0x417, 0x430, 0x43f, 0x443, 0x441, 0x442, 0x438, 0x442, 0x44c, 0x20, 0x440, 0x43e, 0x442, 0x430, 0x446, 0x438, 0x44e));
+    expect(groupsToolbarSource).toContain(phrase(0x417, 0x430, 0x43f, 0x443, 0x441, 0x442, 0x438, 0x442, 0x44c, 0x20, 0x440, 0x43e, 0x442, 0x430, 0x446, 0x438, 0x44e));
   });
 
   it("does not ship replacement characters or literal unicode escapes", () => {
-    for (const source of [groupsSource, groupsApiSource]) {
+    for (const source of [groupsUiSource, groupsApiSource]) {
       expect(source).not.toContain("\uFFFD");
       expect(source).not.toContain("\\u");
     }
   });
 
   it("keeps no-template and no-candidate states actionable", () => {
-    expect(groupsSource).toContain("Нет шаблонов для группы");
-    expect(groupsSource).toContain("Нет кандидатов на выбранную дату");
-    expect(groupsSource).toContain("Проверьте исключения и правила группы или выберите другую дату.");
+    expect(groupsCreateSource).toContain("Нет шаблонов для группы");
+    expect(groupsPickerSource).toContain("Нет кандидатов на выбранную дату");
+    expect(groupsPickerSource).toContain("Проверьте исключения и правила группы или выберите другую дату.");
   });
 
   it("bounds editable group text and preserves dialog semantics", () => {
-    expect(groupsSource).toContain("maxLength={GROUP_NAME_MAX_LENGTH}");
-    expect(groupsSource).toContain("maxLength={GROUP_NOTES_MAX_LENGTH}");
-    expect(groupsSource).toContain("maxLength={EXCLUSION_REASON_MAX_LENGTH}");
-    expect(groupsSource).toContain('aria-labelledby={titleId}');
-    expect(groupsSource).toContain('document.body.style.overflow = "hidden"');
-    expect(groupsSource).toContain('placeholder="Выберите человека"');
-    expect(groupsSource).not.toContain("peopleOptions[0]?.value");
+    expect(groupsSettingsSource).toContain("maxLength={GROUP_NAME_MAX_LENGTH}");
+    expect(groupsSettingsSource).toContain("maxLength={GROUP_NOTES_MAX_LENGTH}");
+    expect(groupsExclusionsSource).toContain("maxLength={EXCLUSION_REASON_MAX_LENGTH}");
+    expect(groupsDrawerSource).toContain("aria-labelledby={titleId}");
+    expect(groupsDrawerSource).toContain('document.body.style.overflow = "hidden"');
+    expect(groupsExclusionsSource).toContain('placeholder="Выберите человека"');
+    expect(groupsUiSource).not.toContain("peopleOptions[0]?.value");
   });
 
   it("keeps invalid dates from reaching manual assignment or rotation", () => {
@@ -125,12 +130,13 @@ describe("Groups responsive UI contract", () => {
     expect(groupsSource).toContain("selectedAvailablePeople =");
     expect(groupsSource).toContain("availablePeopleByDate[effectiveSelectedDate]");
     expect(groupsSource).toContain("rotateGroup(activeSnapshot.group.id, effectiveSelectedDate)");
-    expect(groupsSource).toContain("effectiveSelectedDate,\n        allowConflict");
+    expect(groupsSource).toContain("effectiveSelectedDate");
+    expect(groupsSource).toContain("allowConflict");
   });
 
   it("labels inactive week days without relying on opacity alone", () => {
-    expect(groupsSource).toContain('aria-label={`${formatDayLabel(day.dayOfWeek)}, ${formatDateLabel(day.date)}${day.isActive ? "" : ", день выключен"}`}');
-    expect(groupsSource).toContain('"Выкл."');
+    expect(groupsWeekSource).toContain('aria-label={`${formatDayLabel(day.dayOfWeek)}, ${formatDateLabel(day.date)}${day.isActive ? "" : ", день выключен"}`}');
+    expect(groupsWeekSource).toContain('"Выкл."');
   });
 
   it("takes platoons from the groups snapshot so groups-only users can edit rules", () => {

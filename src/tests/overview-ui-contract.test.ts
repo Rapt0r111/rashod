@@ -2,10 +2,14 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const overviewSource = readFileSync(
-  resolve(process.cwd(), "src/features/roster/components/main-content.tsx"),
-  "utf8",
-);
+const overviewSource = [
+  "src/features/roster/components/overview-section.tsx",
+  "src/features/roster/components/overview-primitives.tsx",
+  "src/features/roster/components/roster-sections.tsx",
+]
+  .map((path) => readFileSync(resolve(process.cwd(), path), "utf8"))
+  .join("\n");
+
 
 describe("Overview responsive layout contract", () => {
   it("keeps location distribution actions content-sized", () => {

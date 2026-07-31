@@ -15,30 +15,11 @@ import {
   type GrantRole,
 } from "./policy";
 import { isSecureSessionCookie } from "./session-cookie";
+import type { AuthContext, RoleRecord, UserRecord } from "./types";
 
 export { isSecureSessionCookie } from "./session-cookie";
+export type { AuthContext, RoleRecord, UserRecord } from "./types";
 
-export type AuthContext = {
-  user: { id: string; username: string; displayName: string };
-  permissions: Permission[];
-  roleIds: string[];
-};
-export type RoleRecord = {
-  id: string;
-  key: string;
-  name: string;
-  description: string;
-  isSystem: boolean;
-  permissions: Permission[];
-};
-export type UserRecord = {
-  id: string;
-  username: string;
-  displayName: string;
-  active: boolean;
-  roleIds: string[];
-  createdAt: number;
-};
 
 const ADMIN_ROLE_ID = "role-administrator";
 const SESSION_COOKIE = "rashod_session";

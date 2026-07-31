@@ -1,0 +1,3 @@
+export const GROUP_NAME_MAX_LENGTH = 120;
+export const GROUP_NOTES_MAX_LENGTH = 1_000;
+export const EXCLUSION_REASON_MAX_LENGTH = 500;

@@ -60,7 +60,7 @@ export const optionalText = (max = DEFAULT_STRING_LIMIT) =>
 
 export const idString = z.string().trim().min(1).max(120);
 export const optionalIdString = idString.optional();
-export const uuidString = z.string().uuid();
+export const uuidString = z.uuid();
 export const sortOrderNumber = z.number().int().min(0).max(9_999_999_999);
 export const sortOrder = sortOrderNumber.optional();
 export const dateKeyString = z.string().refine((value) => {

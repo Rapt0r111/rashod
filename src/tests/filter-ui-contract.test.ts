@@ -17,7 +17,12 @@ describe("Filter UI contracts", () => {
   });
 
   it("keeps selected roster filters highlighted and toggleable", () => {
-    const roster = read("src/features/roster/components/main-content.tsx");
+    const roster = [
+      read("src/features/roster/components/main-content.tsx"),
+      read("src/features/roster/components/overview-section.tsx"),
+      read("src/features/roster/components/overview-primitives.tsx"),
+      read("src/features/roster/components/roster-sections.tsx"),
+    ].join("\n");
 
     expect(roster).toContain("selectedKeys.includes(item.key)");
     expect(roster).toContain("border-accent bg-accent font-extrabold");

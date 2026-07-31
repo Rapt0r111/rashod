@@ -1,5 +1,11 @@
-
-import type { GroupConflict, GroupCreateInput, GroupsSnapshot, GroupUpdateInput, RuleUpdateInput } from "./types";
+import { ApiError, fetchJson, getApiErrorMessage as getBaseApiErrorMessage } from "@/lib/api-client";
+import type {
+  GroupConflict,
+  GroupCreateInput,
+  GroupsSnapshot,
+  GroupUpdateInput,
+  RuleUpdateInput,
+} from "./types";
 
 export class GroupApiError extends Error {
   status: number;
@@ -22,9 +28,32 @@ export class GroupApiError extends Error {
   }
 }
 
+function toGroupApiError(error: unknown): never {
+  if (error instanceof GroupApiError) throw error;
+  if (error instanceof ApiError) {
+    const payload = error.payload;
+    const conflicts =
+      payload &&
+      typeof payload === "object" &&
+      "conflicts" in payload &&
+      Array.isArray((payload as { conflicts: unknown }).conflicts)
+        ? ((payload as { conflicts: GroupConflict[] }).conflicts)
+        : [];
+    const reason =
+      payload &&
+      typeof payload === "object" &&
+      "reason" in payload &&
+      typeof (payload as { reason: unknown }).reason === "string"
+        ? (payload as { reason: string }).reason
+        : undefined;
+    throw new GroupApiError(error.code, error.status, conflicts, reason);
+  }
+  throw error;
+}
+
 export function getGroupErrorMessage(error: unknown, fallback: string) {
   if (!(error instanceof GroupApiError)) {
-    return `${fallback}. Проверьте соединение и повторите попытку.`;
+    return getBaseApiErrorMessage(error, fallback);
   }
 
   if (error.code === "GROUP_ASSIGNMENT_INELIGIBLE") {
@@ -46,50 +75,18 @@ export function getGroupErrorMessage(error: unknown, fallback: string) {
     return "На выбранную дату уже назначено нужное количество людей.";
   }
 
-  switch (error.status) {
-    case 401:
-      return "Сессия истекла. Войдите снова.";
-    case 400:
-      return "Проверьте введённые данные и повторите попытку.";
-    case 403:
-      return "Недостаточно прав для этого действия.";
-    case 404:
-      return "Данные уже изменились или удалены. Обновите экран и повторите попытку.";
-    case 409:
-      return "Данные изменились в другой операции. Обновите экран и повторите попытку.";
-    case 429:
-      return "Слишком много запросов. Подождите немного и повторите попытку.";
-    default:
-      return error.status >= 500
-        ? "Сервер временно недоступен. Повторите попытку позже."
-        : `${fallback}. Повторите попытку.`;
-  }
+  return getBaseApiErrorMessage(
+    new ApiError(error.code, error.status, null),
+    fallback,
+  );
 }
 
 export async function fetchGroupJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-    cache: "no-store",
-  });
-  if (!response.ok) {
-    if (response.status === 401 && typeof window !== "undefined") window.location.assign("/");
-    const payload = await response.json().catch(() => null);
-    const code =
-      payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
-        ? payload.error
-        : `HTTP_${response.status}`;
-    const conflicts =
-      payload && typeof payload === "object" && "conflicts" in payload && Array.isArray(payload.conflicts)
-        ? (payload.conflicts as GroupConflict[])
-        : [];
-    const reason =
-      payload && typeof payload === "object" && "reason" in payload && typeof payload.reason === "string"
-        ? payload.reason
-        : undefined;
-    throw new GroupApiError(code, response.status, conflicts, reason);
+  try {
+    return await fetchJson<T>(url, init);
+  } catch (error) {
+    toGroupApiError(error);
   }
-  return response.json() as Promise<T>;
 }
 
 export function fetchGroupsSnapshot(): Promise<GroupsSnapshot> {
@@ -97,26 +94,46 @@ export function fetchGroupsSnapshot(): Promise<GroupsSnapshot> {
 }
 
 export function createGroup(input: GroupCreateInput): Promise<GroupsSnapshot> {
-  return fetchGroupJson<GroupsSnapshot>("/api/groups", { method: "POST", body: JSON.stringify(input) });
+  return fetchGroupJson<GroupsSnapshot>("/api/groups", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 export function updateGroup(input: GroupUpdateInput): Promise<GroupsSnapshot> {
-  return fetchGroupJson<GroupsSnapshot>("/api/groups", { method: "PUT", body: JSON.stringify(input) });
+  return fetchGroupJson<GroupsSnapshot>("/api/groups", {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
 }
 
 export function deleteGroup(id: string): Promise<GroupsSnapshot> {
-  return fetchGroupJson<GroupsSnapshot>("/api/groups", { method: "DELETE", body: JSON.stringify({ id }) });
+  return fetchGroupJson<GroupsSnapshot>("/api/groups", {
+    method: "DELETE",
+    body: JSON.stringify({ id }),
+  });
 }
 
 export function updateRule(input: RuleUpdateInput): Promise<GroupsSnapshot> {
-  return fetchGroupJson<GroupsSnapshot>("/api/groups/rule", { method: "PUT", body: JSON.stringify(input) });
+  return fetchGroupJson<GroupsSnapshot>("/api/groups/rule", {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
 }
 
 export function rotateGroup(groupId: string, date?: string): Promise<GroupsSnapshot> {
-  return fetchGroupJson<GroupsSnapshot>("/api/groups/rotate", { method: "POST", body: JSON.stringify({ groupId, date }) });
+  return fetchGroupJson<GroupsSnapshot>("/api/groups/rotate", {
+    method: "POST",
+    body: JSON.stringify({ groupId, date }),
+  });
 }
 
-export function assignGroupPerson(groupId: string, personId: string, date?: string, allowConflict = false): Promise<GroupsSnapshot> {
+export function assignGroupPerson(
+  groupId: string,
+  personId: string,
+  date?: string,
+  allowConflict = false,
+): Promise<GroupsSnapshot> {
   return fetchGroupJson<GroupsSnapshot>("/api/groups/assign", {
     method: "POST",
     body: JSON.stringify({ groupId, personId, date, allowConflict }),
@@ -124,10 +141,18 @@ export function assignGroupPerson(groupId: string, personId: string, date?: stri
 }
 
 export function removeGroupAssignment(assignmentId: string): Promise<GroupsSnapshot> {
-  return fetchGroupJson<GroupsSnapshot>("/api/groups/assign", { method: "DELETE", body: JSON.stringify({ assignmentId }) });
+  return fetchGroupJson<GroupsSnapshot>("/api/groups/assign", {
+    method: "DELETE",
+    body: JSON.stringify({ assignmentId }),
+  });
 }
 
-export function excludeGroupPerson(groupId: string, personId: string, dayOfWeek: number | null, reason = ""): Promise<GroupsSnapshot> {
+export function excludeGroupPerson(
+  groupId: string,
+  personId: string,
+  dayOfWeek: number | null,
+  reason = "",
+): Promise<GroupsSnapshot> {
   return fetchGroupJson<GroupsSnapshot>("/api/groups/exclude", {
     method: "POST",
     body: JSON.stringify({ groupId, personId, dayOfWeek, reason }),
@@ -135,5 +160,8 @@ export function excludeGroupPerson(groupId: string, personId: string, dayOfWeek:
 }
 
 export function includeGroupPerson(exclusionId: string): Promise<GroupsSnapshot> {
-  return fetchGroupJson<GroupsSnapshot>("/api/groups/exclude", { method: "DELETE", body: JSON.stringify({ exclusionId }) });
+  return fetchGroupJson<GroupsSnapshot>("/api/groups/exclude", {
+    method: "DELETE",
+    body: JSON.stringify({ exclusionId }),
+  });
 }

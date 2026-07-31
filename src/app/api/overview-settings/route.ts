@@ -20,19 +20,21 @@ const blockIds = [
 const heroMetricKeys = ["total", "present", "peakLocation", "activeLocations"] as const;
 const activityMetricKeys = ["lastHour", "lastDay", "logTotal"] as const;
 
-const overviewSettingsSchema = z.object({
+const overviewBlockSchema = z.looseObject({
+  id: z.enum(blockIds),
+  visible: z.boolean().optional(),
+  density: z.enum(["standard", "compact"]).optional(),
+  layout: z.enum(["full", "half"]).optional(),
+  config: z.unknown().optional(),
+});
+
+const overviewSettingsSchema = z.looseObject({
   version: z.number().int().min(1).max(10).optional(),
-  blocks: uniqueArrayBy(z.object({
-    id: z.enum(blockIds),
-    visible: z.boolean().optional(),
-    density: z.enum(["standard", "compact"]).optional(),
-    layout: z.enum(["full", "half"]).optional(),
-    config: z.unknown().optional(),
-  }).passthrough(), (block) => block.id, blockIds.length),
+  blocks: uniqueArrayBy(overviewBlockSchema, (block) => block.id, blockIds.length),
   heroMetricKeys: uniqueArray(z.enum(heroMetricKeys), heroMetricKeys.length).optional(),
   activityMetricKeys: uniqueArray(z.enum(activityMetricKeys), activityMetricKeys.length).optional(),
   locationSelection: z.unknown().optional(),
-}).passthrough();
+});
 
 export const dynamic = "force-dynamic";
 

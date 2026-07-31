@@ -1,62 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowCounterClockwiseIcon, X } from "@phosphor-icons/react";
+import { useMemo, useState } from "react";
+import { ArrowCounterClockwiseIcon, XIcon } from "@phosphor-icons/react";
 import { SearchSortControl, type SearchSortOption } from "@/components/search-sort-control";
+import { useDialogFocus } from "@/components/use-dialog-focus";
 import type { LocationOption, LogEntry, Person } from "../types";
 import type { ToastBatch } from "../state";
 import { abbreviateName, conscriptionLabel, cx, locationLabel, locationToken, relativeTime } from "../utils";
 import { Avatar, toneClasses } from "./person-views";
 import { filterListItems, sortListItems, type ListSortState } from "@/components/list-utils";
-
-
-const focusableSelector = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-function useDialogFocus(open: boolean, onClose: () => void) {
-  const ref = useRef<HTMLElement>(null);
-  const returnFocusRef = useRef<HTMLElement | null>(null);
-  const onCloseRef = useRef(onClose);
-
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
-    if (!open) return;
-    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const panel = ref.current;
-    window.setTimeout(() => panel?.querySelector<HTMLElement>(focusableSelector)?.focus(), 0);
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onCloseRef.current();
-        return;
-      }
-      if (event.key !== "Tab" || !panel) return;
-      const focusable = Array.from(panel.querySelectorAll<HTMLElement>(focusableSelector)).filter((element) => !element.hasAttribute("disabled"));
-      if (focusable.length === 0) {
-        event.preventDefault();
-        return;
-      }
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      returnFocusRef.current?.focus();
-    };
-  }, [open]);
-
-  return ref;
-}
 
 const historySortOptions: SearchSortOption[] = [
   { key: "alpha", label: "А–Я" },
@@ -76,7 +26,7 @@ export function LocationSheet({
   onPick: (person: Person, value: string) => void;
 }) {
   const [custom, setCustom] = useState("");
-  const panelRef = useDialogFocus(open && !!person, onClose);
+  const panelRef = useDialogFocus(onClose, { open: open && !!person });
   if (!open || !person) return null;
   return (
     <div className="fixed inset-0 z-50 grid place-items-end justify-center bg-bg-overlay backdrop-blur-[10px]" onMouseDown={onClose}>
@@ -162,7 +112,7 @@ export function HistoryPanel({
 }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<ListSortState>({ key: "alpha", direction: "asc" });
-  const panelRef = useDialogFocus(open, onClose);
+  const panelRef = useDialogFocus(onClose, { open });
   const visibleLogs = useMemo(() => sortListItems(
     filterListItems(logs, query, (log) => `${log.name} ${log.from} ${log.to}`),
     sort,
@@ -187,7 +137,7 @@ export function HistoryPanel({
             onClick={onClose}
             aria-label="Закрыть журнал"
           >
-            <X size={18} />
+            <XIcon size={18} />
           </button>
         </div>
         <div className="overflow-auto px-4 pb-4.5 pt-3">

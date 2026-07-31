@@ -25,10 +25,11 @@ describe("Tasks UI contracts", () => {
 
   it("refreshes tasks after shared roster events", () => {
     const tasks = read("src/features/tasks/TasksApp.tsx");
+    const realtime = read("src/features/realtime/RealtimeProvider.tsx");
 
-    expect(tasks).toContain('new EventSource("/api/events")');
-    expect(tasks).toContain('source.addEventListener("roster", () => void refresh())');
-    expect(tasks).toContain("source.close()");
+    expect(tasks).toContain('useRealtimeDomain(["tasks", "unknown"]');
+    expect(realtime).toContain('new EventSource("/api/events")');
+    expect(realtime).toContain("source.close()");
   });
 
   it("makes collapsed controls inert while hidden", () => {

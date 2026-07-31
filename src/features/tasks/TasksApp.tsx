@@ -13,6 +13,7 @@ import { CollapsibleFilter } from "@/components/collapsible-filter";
 import { DisclosureContent } from "@/components/disclosure-content";
 import { SearchSortControl, type SearchSortOption } from "@/components/search-sort-control";
 import { filterListItems, sortListItems, type ListSortState } from "@/components/list-utils";
+import { useRealtimeDomain } from "@/features/realtime/RealtimeProvider";
 import { fetchTasksSnapshot, saveTask, setTaskCompleted, updateTask } from "./api";
 import { filterTaskTree, taskProgress, taskTree, toggleTaskFilter, type TaskFilter } from "./logic";
 import type { Task, TasksSnapshot } from "./types";
@@ -50,11 +51,9 @@ export function TasksApp({
     }
   }, []);
 
-  useEffect(() => {
-    const source = new EventSource("/api/events");
-    source.addEventListener("roster", () => void refresh());
-    return () => source.close();
-  }, [refresh]);
+  useRealtimeDomain(["tasks", "unknown"], () => {
+    void refresh();
+  });
 
   const tree = useMemo(() => taskTree(snapshot.active), [snapshot.active]);
   const allTasks = useMemo(

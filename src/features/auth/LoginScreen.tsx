@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useState, type SyntheticEvent } from "react";
 
 export function LoginScreen({ setupRequired }: { setupRequired: boolean }) {
   const [username, setUsername] = useState("");
@@ -8,7 +8,7 @@ export function LoginScreen({ setupRequired }: { setupRequired: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     setPending(true);

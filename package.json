@@ -20,7 +20,8 @@
         "test:db:reset": "bun run scripts/reset-test-db.ts",
         "db:generate": "drizzle-kit generate",
         "db:migrate": "bun --env-file=.env --bun run src/server/db/migrate-postgres.ts",
-        "auth:create-admin": "bun --env-file=.env --bun run src/server/auth/create-admin.ts"
+        "auth:create-admin": "bun --env-file=.env --bun run src/server/auth/create-admin.ts",
+        "bundle:offline": "bun run scripts/bundle-offline.ts"
     },
     "dependencies": {
         "@phosphor-icons/react": "^2.1.10",

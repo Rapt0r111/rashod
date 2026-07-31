@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import {
   ClockCounterClockwiseIcon,
   DownloadSimpleIcon,
-  List,
-  SidebarSimple,
-  ArrowsOutSimple,
-  ArrowsInSimple,
+  ListIcon,
+  SidebarSimpleIcon,
+  ArrowsOutSimpleIcon,
+  ArrowsInSimpleIcon,
   SignOutIcon,
 } from "@phosphor-icons/react";
 import { formatClock, formatDateLabel } from "../utils";
@@ -52,7 +52,7 @@ export function TopBar(props: {
           onClick={props.onMenu}
           aria-label="Открыть меню разделов"
         >
-          <List size={20} weight="bold" />
+          <ListIcon size={20} weight="bold" />
         </button>
         <button
           className="relative grid h-10 w-10 place-items-center rounded-xl border border-line text-text-secondary transition hover:border-line-strong hover:bg-white/7.5"
@@ -80,7 +80,7 @@ export function TopBar(props: {
             onClick={props.onAdmin}
             aria-label="Справочники"
           >
-            <SidebarSimple size={20} weight="regular" />
+            <SidebarSimpleIcon size={20} weight="regular" />
           </button>
         )}
         <button
@@ -94,9 +94,9 @@ export function TopBar(props: {
           }
         >
           {props.isFullscreen ? (
-            <ArrowsInSimple size={20} weight="regular" />
+            <ArrowsInSimpleIcon size={20} weight="regular" />
           ) : (
-            <ArrowsOutSimple size={20} weight="regular" />
+            <ArrowsOutSimpleIcon size={20} weight="regular" />
           )}
         </button>
         <button

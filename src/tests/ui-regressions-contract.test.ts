@@ -76,19 +76,28 @@ describe("Critical UI regression contracts", () => {
   });
 
   it("redirects expired task sessions and closes references without a back loop", () => {
-    const tasksApi = read("src/features/tasks/api.ts");
+    const apiClient = read("src/lib/api-client.ts");
     const references = read("src/features/roster/ReferencesApp.tsx");
 
-    expect(tasksApi).toContain("response.status === 401");
-    expect(tasksApi).toContain('window.location.assign("/")');
+    expect(apiClient).toContain("response.status === 401");
+    expect(apiClient).toContain('window.location.assign("/")');
     expect(references).toContain('router.replace("/")');
     expect(references).not.toContain('router.push("/")');
   });
 
   it("covers zero filtered roster results and visible async failures", () => {
     const app = read("src/features/roster/RosterApp.tsx");
-    const main = read("src/features/roster/components/main-content.tsx");
-    const admin = read("src/features/roster/components/admin-panel.tsx");
+    const main = [
+      read("src/features/roster/components/main-content.tsx"),
+      read("src/features/roster/components/overview-section.tsx"),
+      read("src/features/roster/components/overview-primitives.tsx"),
+      read("src/features/roster/components/roster-sections.tsx"),
+    ].join("\n");
+    const admin = [
+      read("src/features/roster/components/admin-panel.tsx"),
+      read("src/features/roster/components/admin/platoon-admin.tsx"),
+      read("src/features/roster/components/admin/location-admin.tsx"),
+    ].join("\n");
 
     expect(main).toContain("visibleGroups.length === 0");
     expect(app).toContain("Не удалось отменить изменение");
@@ -99,7 +108,10 @@ describe("Critical UI regression contracts", () => {
   });
 
   it("guards destructive group deletion and provides an app error boundary", () => {
-    const groups = read("src/features/groups/GroupsApp.tsx");
+    const groups = [
+      read("src/features/groups/GroupsApp.tsx"),
+      read("src/features/groups/components/settings-panel.tsx"),
+    ].join("\n");
     const errorBoundary = read("src/app/error.tsx");
 
     expect(groups).toContain("Удалить группу?");

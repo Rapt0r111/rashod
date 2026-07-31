@@ -13,7 +13,8 @@ import {
 import type { Person, Snapshot, ToastChange } from "./types";
 import type { GroupsSnapshot } from "../groups/types";
 import { buildRosterCsv, exportCsvFile } from "./csv";
-import { fetchJson } from "./api";
+import { fetchJson, getApiErrorMessage } from "./api";
+import { useRealtimeDomain } from "@/features/realtime/RealtimeProvider";
 import {
   bySort,
   countInRota,
@@ -119,8 +120,12 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
   );
 
   const refreshSnapshot = useCallback(async (preserveUi = true) => {
-    const snapshot = await fetchJson<Snapshot>("/api/snapshot");
-    dispatch({ type: "snapshot", snapshot, preserveUi });
+    try {
+      const snapshot = await fetchJson<Snapshot>("/api/snapshot");
+      dispatch({ type: "snapshot", snapshot, preserveUi });
+    } catch {
+      // SSE-driven refresh: keep last good snapshot; avoid unhandled rejection.
+    }
   }, []);
 
   useEffect(() => () => {
@@ -128,21 +133,9 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
     if (flashTimer.current) clearTimeout(flashTimer.current);
   }, []);
 
-  useEffect(() => {
-    const source = new EventSource("/api/events");
-    source.addEventListener("roster", (event) => {
-      let reason = "";
-      try {
-        reason = JSON.parse((event as MessageEvent<string>).data).reason ?? "";
-      } catch {
-        // Keep live updates resilient to malformed external events.
-      }
-      if (!reason || ["location-change", "undo", "people", "platoons", "locations", "location-groups", "overview-settings"].includes(reason)) {
-        void refreshSnapshot(true);
-      }
-    });
-    return () => source.close();
-  }, [refreshSnapshot]);
+  useRealtimeDomain(["roster", "unknown"], () => {
+    void refreshSnapshot(true);
+  });
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -308,8 +301,10 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
           to,
         });
         dispatch({ type: "closeSheet" });
-      } catch {
-        setLocationError("Не удалось изменить местоположение. Проверьте соединение и повторите.");
+      } catch (error) {
+        setLocationError(
+          getApiErrorMessage(error, "Не удалось изменить местоположение"),
+        );
       } finally {
         setPendingLocationPersonId(null);
       }
@@ -331,8 +326,8 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
       });
       dispatch({ type: "snapshot", snapshot, preserveUi: true });
       setToastBatch(null);
-    } catch {
-      setActionError("Не удалось отменить изменение. Повторите попытку.");
+    } catch (error) {
+      setActionError(getApiErrorMessage(error, "Не удалось отменить изменение"));
     }
   }
 

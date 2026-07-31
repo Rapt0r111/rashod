@@ -85,3 +85,30 @@ export const permissions = pgTable("permissions", { key: text("key").primaryKey(
 export const userRoles = pgTable("user_roles", { userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade", onUpdate: "cascade" }), roleId: text("role_id").notNull().references(() => roles.id, { onDelete: "cascade", onUpdate: "cascade" }) }, (table) => [primaryKey({ columns: [table.userId, table.roleId] })]);
 export const rolePermissions = pgTable("role_permissions", { roleId: text("role_id").notNull().references(() => roles.id, { onDelete: "cascade", onUpdate: "cascade" }), permissionKey: text("permission_key").notNull().references(() => permissions.key, { onDelete: "cascade", onUpdate: "cascade" }) }, (table) => [primaryKey({ columns: [table.roleId, table.permissionKey] })]);
 export const sessions = pgTable("sessions", { tokenHash: text("token_hash").primaryKey(), userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade", onUpdate: "cascade" }), sessionVersion: integer("session_version").notNull().default(0), expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(), createdAt: createdAt() }, (table) => [index("idx_sessions_user").on(table.userId), index("idx_sessions_expires_at").on(table.expiresAt)]);
+export const loginRateLimits = pgTable("login_rate_limits", {
+  key: text("key").primaryKey(),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  windowStartedAt: timestamp("window_started_at", { withTimezone: true }).defaultNow().notNull(),
+  blockedUntil: timestamp("blocked_until", { withTimezone: true }),
+});
+export const authAuditEvents = pgTable(
+  "auth_audit_events",
+  {
+    id: id(),
+    action: text("action").notNull(),
+    actorUserId: text("actor_user_id").references(() => users.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+    targetUserId: text("target_user_id").references(() => users.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+    metadata: jsonb("metadata").notNull().default({}),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_auth_audit_events_occurred_at").on(table.occurredAt),
+    index("idx_auth_audit_events_target").on(table.targetUserId, table.occurredAt),
+  ],
+);

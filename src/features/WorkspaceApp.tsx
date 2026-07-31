@@ -7,6 +7,7 @@ import type { Snapshot } from "./roster/types";
 import type { GroupsSnapshot } from "./groups/types";
 import type { TasksSnapshot } from "./tasks/types";
 import { Loader } from "@/components/loader";
+import { RealtimeProvider } from "@/features/realtime/RealtimeProvider";
 
 const GroupsApp = dynamic(
   () => import("./groups/GroupsApp").then((module) => module.GroupsApp),
@@ -23,6 +24,14 @@ type WorkspaceProps =
   | { mode: "tasks"; initialSnapshot: TasksSnapshot; canWrite: boolean };
 
 export function WorkspaceApp(props: WorkspaceProps) {
+  return (
+    <RealtimeProvider>
+      <WorkspaceBody {...props} />
+    </RealtimeProvider>
+  );
+}
+
+function WorkspaceBody(props: WorkspaceProps) {
   if (props.mode === "roster") {
     return <RosterApp initialSnapshot={props.initialSnapshot} permissions={props.permissions} />;
   }

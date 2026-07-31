@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import {
   ClockCounterClockwiseIcon,
   DownloadSimpleIcon,
@@ -7,64 +6,12 @@ import {
   UsersThreeIcon,
   XIcon,
 } from "@phosphor-icons/react";
+import { useDialogFocus } from "@/components/use-dialog-focus";
 import type { Person } from "../types";
 import { SERVICE_SECTIONS } from "../constants";
 import { cx } from "../utils";
 
 export type SectionCounts = Partial<Record<string, number>>;
-
-const focusableSelector = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-function useDialogFocus(open: boolean, onClose: () => void) {
-  const ref = useRef<HTMLElement>(null);
-  const returnFocusRef = useRef<HTMLElement | null>(null);
-  const onCloseRef = useRef(onClose);
-
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
-    if (!open) return;
-    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const panel = ref.current;
-    window.setTimeout(() => {
-      const first = panel?.querySelector<HTMLElement>(focusableSelector);
-      first?.focus();
-    }, 0);
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onCloseRef.current();
-        return;
-      }
-      if (event.key !== "Tab" || !panel) return;
-      const focusable = Array.from(panel.querySelectorAll<HTMLElement>(focusableSelector)).filter((element) => element.offsetParent !== null);
-      if (focusable.length === 0) {
-        event.preventDefault();
-        return;
-      }
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      returnFocusRef.current?.focus();
-    };
-  }, [open]);
-
-  return ref;
-}
 
 function formatCompactCount(value: number) {
   return value > 999 ? "999+" : String(value);
@@ -162,7 +109,7 @@ export function SectionDrawer({
   canReadGroups: boolean;
   canReadTasks: boolean;
 }) {
-  const panelRef = useDialogFocus(open, onClose);
+  const panelRef = useDialogFocus(onClose, { open, visibleOnly: true });
   if (!open) return null;
   const items = sectionItems(people, counts, canReadGroups, canReadTasks);
   return (
