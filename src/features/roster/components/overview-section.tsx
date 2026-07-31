@@ -13,7 +13,7 @@ import type {
 } from "../types";
 import type { Action, State } from "../state";
 import {
-  countInRota,
+  countPresent,
   conscriptionOptions,
   cx,
   peopleForPlatoon,
@@ -26,6 +26,8 @@ import {
 import {
   locationsAndCustom,
   overviewLocationMetrics,
+  platoonLocationMatrix,
+  presentLocationKeys,
   rosterBalance,
 } from "../roster-metrics";
 import { normalizeOverviewSettings, overviewBlock } from "../overview-settings";
@@ -55,6 +57,7 @@ export function Overview({
   ui,
   onSection,
   onLocationFilter,
+  onPlatoonLocation,
   onCustomizeOverview,
   canCustomizeOverview,
   dispatch,
@@ -69,6 +72,7 @@ export function Overview({
   ui: State["ui"];
   onSection: (key: string) => void;
   onLocationFilter: (keys: string[]) => void;
+  onPlatoonLocation?: (platoonId: string, locationKey: string) => void;
   onCustomizeOverview: () => void;
   canCustomizeOverview: boolean;
   dispatch: Dispatch<Action>;
@@ -185,7 +189,24 @@ export function Overview({
     () => Math.max(1, ...selectedLocationCards.map((item) => item.count)),
     [selectedLocationCards],
   );
-  const balance = useMemo(() => rosterBalance(filteredPeople), [filteredPeople]);
+  const presentKeys = useMemo(
+    () => presentLocationKeys(locations),
+    [locations],
+  );
+  const balance = useMemo(
+    () => rosterBalance(filteredPeople, presentKeys),
+    [filteredPeople, presentKeys],
+  );
+  const locationMatrix = useMemo(
+    () =>
+      platoonLocationMatrix(
+        filteredPeople,
+        platoons,
+        locations,
+        presentKeys,
+      ),
+    [filteredPeople, platoons, locations, presentKeys],
+  );
   const total = balance.total;
   const present = balance.present;
   const presentPct = balance.presentPct;
@@ -255,12 +276,12 @@ export function Overview({
     () =>
       platoons.map((platoon) => {
         const roster = peopleForPlatoon(filteredPeople, platoon.id);
-        const inRota = countInRota(roster);
+        const inRota = countPresent(roster, presentKeys);
         const rate =
           roster.length === 0 ? 0 : Math.round((inRota / roster.length) * 100);
         return { platoon, roster, inRota, rate };
       }),
-    [filteredPeople, platoons],
+    [filteredPeople, platoons, presentKeys],
   );
   const visiblePlatoonStats = useMemo(() => {
     const selected = selectedOverviewItems(
@@ -636,6 +657,89 @@ export function Overview({
                   ),
                 )}
               </div>
+              {locationMatrix.rows.length > 0 && locationMatrix.locationKeys.length > 0 && (
+                <div className="mt-1 min-w-0 overflow-x-auto overscroll-x-contain rounded-[14px] border border-line">
+                  <table className="w-full min-w-max border-collapse text-left text-xs">
+                    <caption className="sr-only">Матрица: взвод × место</caption>
+                    <thead>
+                      <tr className="border-b border-line bg-white/[0.03]">
+                        <th className="sticky left-0 z-1 bg-[color-mix(in_oklch,var(--bg-panel)_96%,transparent)] px-2.5 py-2 font-semibold text-text-secondary">
+                          Подразделение
+                        </th>
+                        {locationMatrix.locationKeys.map((key) => (
+                          <th
+                            key={key}
+                            className="px-2 py-2 text-center font-semibold text-text-muted"
+                            title={locationLabel(key, locations)}
+                          >
+                            <span className="inline-flex max-w-18 truncate">
+                              {locationLabel(key, locations)}
+                            </span>
+                          </th>
+                        ))}
+                        <th className="px-2.5 py-2 text-center font-semibold text-text-secondary">
+                          Σ
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {locationMatrix.rows.map((row) => (
+                        <tr key={row.platoon.id} className="border-b border-line last:border-0">
+                          <th className="sticky left-0 z-1 bg-[color-mix(in_oklch,var(--bg-panel)_96%,transparent)] px-2.5 py-1.5 text-left font-semibold text-text-primary">
+                            {row.platoon.label}
+                          </th>
+                          {locationMatrix.locationKeys.map((key) => {
+                            const count = row.byLocation[key] ?? 0;
+                            return (
+                              <td key={key} className="px-1 py-1 text-center">
+                                {count > 0 ? (
+                                  <button
+                                    type="button"
+                                    className={cx(
+                                      "inline-flex min-h-8 min-w-8 items-center justify-center rounded-lg px-1.5 font-mono text-sm tabular-nums transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan",
+                                      toneClasses(locationToken(key, locations)).soft,
+                                      toneClasses(locationToken(key, locations)).text,
+                                    )}
+                                    onClick={() =>
+                                      onPlatoonLocation?.(row.platoon.id, key)
+                                    }
+                                    aria-label={`${row.platoon.label}, ${locationLabel(key, locations)}: ${count}`}
+                                  >
+                                    {count}
+                                  </button>
+                                ) : (
+                                  <span className="font-mono text-text-muted/50">·</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                          <td className="px-2.5 py-1.5 text-center font-mono font-bold tabular-nums text-text-secondary">
+                            {row.total}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-line bg-white/[0.03]">
+                        <th className="sticky left-0 z-1 bg-[color-mix(in_oklch,var(--bg-panel)_96%,transparent)] px-2.5 py-2 text-left font-semibold text-text-secondary">
+                          Итого
+                        </th>
+                        {locationMatrix.locationKeys.map((key) => (
+                          <td
+                            key={key}
+                            className="px-2 py-2 text-center font-mono font-bold tabular-nums text-text-secondary"
+                          >
+                            {locationMatrix.columnTotals[key] ?? 0}
+                          </td>
+                        ))}
+                        <td className="px-2.5 py-2 text-center font-mono font-bold tabular-nums text-accent">
+                          {locationMatrix.grandTotal}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
             </section>
           </OverviewBlock>
         )}

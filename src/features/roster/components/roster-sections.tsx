@@ -4,12 +4,12 @@ import { CollapsibleFilter } from "@/components/collapsible-filter";
 import type { LocationOption, Person, Platoon } from "../types";
 import type { Action, State } from "../state";
 import {
-  countInRota,
+  countPresent,
   conscriptionOptions,
   peopleForPlatoon,
   selectedFilterKeys,
 } from "../utils";
-import { locationsAndCustom } from "../roster-metrics";
+import { locationsAndCustom, presentLocationKeys } from "../roster-metrics";
 import { sortListItems } from "@/components/list-utils";
 import type { SelectionProps } from "./selection-types";
 import { PersonCard, RosterRow } from "./person-views";
@@ -58,7 +58,12 @@ export function AllPlatoons({
     [people, platoons],
   );
 
-  // Memoize visible groups with their rota counts
+  const presentKeys = useMemo(
+    () => presentLocationKeys(locations),
+    [locations],
+  );
+
+  // Memoize visible groups with present counts
   const visibleGroups = useMemo(
     () =>
       visiblePlatoons
@@ -90,12 +95,13 @@ export function AllPlatoons({
               rank: (person) => person.rank,
               defaultCompare: (a, b) => a.sortOrder - b.sortOrder,
             }),
-            inRota: countInRota(group),
+            inRota: countPresent(group, presentKeys),
           };
         })
         .filter((item) => item.group.length > 0),
     [
       people,
+      presentKeys,
       visiblePlatoons,
       state.ui.locationFilter,
       state.ui.locationFilterKeys,

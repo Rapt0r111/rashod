@@ -56,8 +56,12 @@ try {
     }
     for (const location of seed.locations) {
       await transaction`
-        INSERT INTO locations (id, key, label, color_token, is_quick, quick_code, is_system, sort_order)
-        VALUES (${location.id}, ${location.key}, ${location.label}, ${location.colorToken}, ${location.isQuick}, ${location.quickCode ?? null}, ${location.isSystem}, ${location.sortOrder})
+        INSERT INTO locations (id, key, label, color_token, is_quick, quick_code, is_system, counts_as_present, sort_order)
+        VALUES (
+          ${location.id}, ${location.key}, ${location.label}, ${location.colorToken},
+          ${location.isQuick}, ${location.quickCode ?? null}, ${location.isSystem},
+          ${location.countsAsPresent}, ${location.sortOrder}
+        )
       `;
     }
     for (const person of seed.people) {

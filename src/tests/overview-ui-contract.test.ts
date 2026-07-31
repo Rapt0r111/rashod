@@ -32,4 +32,10 @@ describe("Overview responsive layout contract", () => {
     expect(overviewSource).not.toContain("duration-500");
     expect(overviewSource).toContain("duration-200 motion-reduce:transition-none");
   });
+
+  it("renders platoon × location matrix with drill-down cells", () => {
+    expect(overviewSource).toContain("platoonLocationMatrix");
+    expect(overviewSource).toContain("Матрица: взвод × место");
+    expect(overviewSource).toContain("onPlatoonLocation");
+  });
 });

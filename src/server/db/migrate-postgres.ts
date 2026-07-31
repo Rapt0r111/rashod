@@ -11,6 +11,7 @@ export const POSTGRES_MIGRATIONS = [
   "0005_data_integrity_normalization.sql",
   "0006_person_conscription_number.sql",
   "0007_performance_indexes.sql",
+  "0008_location_counts_as_present.sql",
 ] as const;
 
 type MigrationName = (typeof POSTGRES_MIGRATIONS)[number];
@@ -18,7 +19,7 @@ type SqlExecutor = Sql | TransactionSql;
 
 const REQUIRED_SCHEMA: Record<string, readonly string[]> = {
   platoons: ["id", "key", "label", "sort_order", "is_system"],
-  locations: ["id", "key", "label", "color_token", "is_quick", "quick_code", "is_system", "sort_order"],
+  locations: ["id", "key", "label", "color_token", "is_quick", "quick_code", "is_system", "sort_order", "counts_as_present"],
   people: ["id", "platoon_id", "rank", "name", "conscription_number", "location", "sort_order", "created_at", "updated_at"],
   movement_logs: ["id", "person_id", "name", "from_value", "to_value", "occurred_at"],
   group_templates: ["id", "key", "name", "color_token", "icon", "default_people_per_day", "default_active_days", "sort_order", "is_system", "created_at"],
@@ -42,7 +43,11 @@ const INITIAL_SCHEMA = Object.fromEntries(
     .filter(([table]) => !["tasks", "location_groups", "location_group_members", "overview_settings"].includes(table))
     .map(([table, columns]) => [
       table,
-      table === "people" ? columns.filter((column) => column !== "conscription_number") : columns,
+      table === "people"
+        ? columns.filter((column) => column !== "conscription_number")
+        : table === "locations"
+          ? columns.filter((column) => column !== "counts_as_present")
+          : columns,
     ]),
 );
 const REQUIRED_CONSTRAINTS = [

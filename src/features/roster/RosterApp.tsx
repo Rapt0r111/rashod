@@ -19,6 +19,7 @@ import {
   bySort,
   filterPeople,
   filterPeopleByRosterFilters,
+  locationLabel,
 } from "./utils";
 import { initialUi, reducer, type ToastBatch } from "./state";
 import {
@@ -27,6 +28,7 @@ import {
 } from "./navigation-history";
 import type { AdminTab } from "./components/admin-panel";
 import {
+  BatchConfirmDialog,
   BatchLocationSheet,
   HistoryPanel,
   LocationSheet,
@@ -119,6 +121,11 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [visiblePersonIds, setVisiblePersonIds] = useState<string[]>([]);
   const [batchSheetOpen, setBatchSheetOpen] = useState(false);
+  const [batchConfirm, setBatchConfirm] = useState<{
+    ids: string[];
+    to: string;
+    fromSummary: string;
+  } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -329,22 +336,10 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
       if (pendingLocationIds.has(person.id) || person.location === to) return;
       setPendingLocationIds((current) => new Set(current).add(person.id));
       setLocationError(null);
-      // Optimistic local update for snappy tablet UX
       const previousLocation = person.location;
       dispatch({
-        type: "snapshot",
-        snapshot: {
-          people: state.people.map((item) =>
-            item.id === person.id ? { ...item, location: to, updatedAt: Date.now() } : item,
-          ),
-          platoons: state.platoons,
-          locations: state.locations,
-          locationGroups: state.locationGroups,
-          overviewSettings: state.overviewSettings,
-          changeLog: state.changeLog,
-          serverTime: state.serverTime,
-        },
-        preserveUi: true,
+        type: "patchPeopleLocations",
+        patches: [{ personId: person.id, location: to }],
       });
       dispatch({ type: "flash", personId: person.id });
       if (flashTimer.current) clearTimeout(flashTimer.current);
@@ -364,21 +359,8 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
         dispatch({ type: "closeSheet" });
       } catch (error) {
         dispatch({
-          type: "snapshot",
-          snapshot: {
-            people: state.people.map((item) =>
-              item.id === person.id
-                ? { ...item, location: previousLocation }
-                : item,
-            ),
-            platoons: state.platoons,
-            locations: state.locations,
-            locationGroups: state.locationGroups,
-            overviewSettings: state.overviewSettings,
-            changeLog: state.changeLog,
-            serverTime: state.serverTime,
-          },
-          preserveUi: true,
+          type: "patchPeopleLocations",
+          patches: [{ personId: person.id, location: previousLocation }],
         });
         setLocationError(
           getApiErrorMessage(error, "Не удалось изменить местоположение"),
@@ -391,65 +373,53 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
         });
       }
     },
-    [addToast, canWriteRoster, pendingLocationIds, state],
+    [addToast, canWriteRoster, pendingLocationIds],
   );
 
-  const applyLocationBatch = useCallback(
-    async (personIds: string[], to: string) => {
-      if (!canWriteRoster || !personIds.length) return;
+  const runLocationBatch = useCallback(
+    async (ids: string[], to: string) => {
+      if (!canWriteRoster || !ids.length) return;
+      const idSet = new Set(ids);
       const targets = state.people.filter(
-        (person) => personIds.includes(person.id) && person.location !== to,
+        (person) => idSet.has(person.id) && person.location !== to,
       );
       if (!targets.length) {
         clearSelection();
-        return;
-      }
-      if (
-        targets.length >= 10 &&
-        typeof window !== "undefined" &&
-        !window.confirm(
-          `Перевести ${targets.length} чел. в выбранное место?`,
-        )
-      ) {
+        setBatchConfirm(null);
         return;
       }
 
-      const ids = targets.map((person) => person.id);
-      const previous = new Map(targets.map((person) => [person.id, person.location]));
+      const targetIds = targets.map((person) => person.id);
+      const previous = new Map(
+        targets.map((person) => [person.id, person.location]),
+      );
       setPendingLocationIds((current) => {
         const next = new Set(current);
-        for (const id of ids) next.add(id);
+        for (const id of targetIds) next.add(id);
         return next;
       });
       setLocationError(null);
       setBatchSheetOpen(false);
+      setBatchConfirm(null);
 
       dispatch({
-        type: "snapshot",
-        snapshot: {
-          people: state.people.map((item) =>
-            previous.has(item.id)
-              ? { ...item, location: to, updatedAt: Date.now() }
-              : item,
-          ),
-          platoons: state.platoons,
-          locations: state.locations,
-          locationGroups: state.locationGroups,
-          overviewSettings: state.overviewSettings,
-          changeLog: state.changeLog,
-          serverTime: state.serverTime,
-        },
-        preserveUi: true,
+        type: "patchPeopleLocations",
+        patches: targetIds.map((personId) => ({ personId, location: to })),
       });
 
       try {
         const snapshot = await fetchJson<
           Snapshot & {
-            changed?: Array<{ personId: string; name: string; from: string; to: string }>;
+            changed?: Array<{
+              personId: string;
+              name: string;
+              from: string;
+              to: string;
+            }>;
           }
         >("/api/location-change", {
           method: "POST",
-          body: JSON.stringify({ personIds: ids, to }),
+          body: JSON.stringify({ personIds: targetIds, to }),
         });
         dispatch({ type: "snapshot", snapshot, preserveUi: true });
         const changed =
@@ -469,20 +439,11 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
         clearSelection();
       } catch (error) {
         dispatch({
-          type: "snapshot",
-          snapshot: {
-            people: state.people.map((item) => {
-              const from = previous.get(item.id);
-              return from !== undefined ? { ...item, location: from } : item;
-            }),
-            platoons: state.platoons,
-            locations: state.locations,
-            locationGroups: state.locationGroups,
-            overviewSettings: state.overviewSettings,
-            changeLog: state.changeLog,
-            serverTime: state.serverTime,
-          },
-          preserveUi: true,
+          type: "patchPeopleLocations",
+          patches: [...previous.entries()].map(([personId, location]) => ({
+            personId,
+            location,
+          })),
         });
         setLocationError(
           getApiErrorMessage(error, "Не удалось изменить местоположение"),
@@ -490,12 +451,55 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
       } finally {
         setPendingLocationIds((current) => {
           const next = new Set(current);
-          for (const id of ids) next.delete(id);
+          for (const id of targetIds) next.delete(id);
           return next;
         });
       }
     },
-    [addToasts, canWriteRoster, clearSelection, state],
+    [addToasts, canWriteRoster, clearSelection, state.people],
+  );
+
+  const applyLocationBatch = useCallback(
+    (personIds: string[], to: string) => {
+      if (!canWriteRoster || !personIds.length) return;
+      const idSet = new Set(personIds);
+      const targets = state.people.filter(
+        (person) => idSet.has(person.id) && person.location !== to,
+      );
+      if (!targets.length) {
+        clearSelection();
+        return;
+      }
+      if (targets.length >= 10) {
+        const fromCounts = new Map<string, number>();
+        for (const person of targets) {
+          fromCounts.set(
+            person.location,
+            (fromCounts.get(person.location) ?? 0) + 1,
+          );
+        }
+        const fromSummary = [...fromCounts.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 4)
+          .map(
+            ([key, count]) =>
+              `${locationLabel(key, state.locations)}: ${count}`,
+          )
+          .join(" · ");
+        setBatchConfirm({
+          ids: targets.map((person) => person.id),
+          to,
+          fromSummary: fromSummary ? `Сейчас: ${fromSummary}` : "",
+        });
+        setBatchSheetOpen(false);
+        return;
+      }
+      void runLocationBatch(
+        targets.map((person) => person.id),
+        to,
+      );
+    },
+    [canWriteRoster, clearSelection, runLocationBatch, state.locations, state.people],
   );
 
   async function undoToast() {
@@ -537,6 +541,15 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
     if (!locationKeys.length) return;
     selectSection("all");
     dispatch({ type: "locationFilters", value: locationKeys });
+    dispatch({ type: "search", value: "" });
+    setMenuOpen(false);
+    mainRef.current?.scrollTo({ top: 0, behavior: "instant" });
+  }
+
+  function selectPlatoonLocation(platoonId: string, locationKey: string) {
+    selectSection("all");
+    dispatch({ type: "platoonFilter", value: platoonId });
+    dispatch({ type: "locationFilters", value: [locationKey] });
     dispatch({ type: "search", value: "" });
     setMenuOpen(false);
     mainRef.current?.scrollTo({ top: 0, behavior: "instant" });
@@ -697,6 +710,7 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
               locations={sortedLocations}
               onSection={selectSection}
               onLocationFilter={selectLocationFilters}
+              onPlatoonLocation={selectPlatoonLocation}
               onCustomizeOverview={() => openAdmin("overview")}
               onLocation={applyLocation}
               canWrite={canWriteRoster}
@@ -754,7 +768,20 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
           open={batchSheetOpen}
           onClose={() => setBatchSheetOpen(false)}
           onPick={(to) => {
-            void applyLocationBatch([...selectedIds], to);
+            applyLocationBatch([...selectedIds], to);
+          }}
+        />
+      )}
+      {canWriteRoster && batchConfirm && (
+        <BatchConfirmDialog
+          open
+          count={batchConfirm.ids.length}
+          toLabel={locationLabel(batchConfirm.to, sortedLocations)}
+          fromSummary={batchConfirm.fromSummary}
+          pending={pendingLocationIds.size > 0}
+          onCancel={() => setBatchConfirm(null)}
+          onConfirm={() => {
+            void runLocationBatch(batchConfirm.ids, batchConfirm.to);
           }}
         />
       )}
@@ -785,7 +812,7 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
           }}
           onClear={clearSelection}
           onMove={(to) => {
-            void applyLocationBatch([...selectedIds], to);
+            applyLocationBatch([...selectedIds], to);
           }}
           onOpenMore={() => setBatchSheetOpen(true)}
         />

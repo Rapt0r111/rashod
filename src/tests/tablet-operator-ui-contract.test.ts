@@ -36,6 +36,8 @@ describe("Tablet operator workflow contract", () => {
     expect(app).toContain("Не удалось изменить местоположение");
     expect(app).toContain("personIds");
     expect(app).toContain("applyLocationBatch");
+    expect(app).toContain("patchPeopleLocations");
+    expect(app).toContain("BatchConfirmDialog");
   });
 
   it("keeps the polished roster rail quiet and recognizable", () => {

@@ -33,7 +33,7 @@ export async function getPostgresSnapshot(): Promise<Snapshot> {
   const [people, platoons, locations, locationGroups, locationGroupMembers, overviewSettingsRow, changeLog] = await Promise.all([
     sql<DbPerson[]>`SELECT id, platoon_id AS "platoonId", rank, name, conscription_number AS "conscriptionNumber", location, sort_order AS "sortOrder", created_at, updated_at FROM people ORDER BY sort_order, name`,
     sql<Platoon[]>`SELECT id, key, label, sort_order AS "sortOrder", is_system AS "isSystem" FROM platoons ORDER BY sort_order, label`,
-    sql<LocationOption[]>`SELECT id, key, label, color_token AS "colorToken", is_quick AS "isQuick", quick_code AS "quickCode", is_system AS "isSystem", sort_order AS "sortOrder" FROM locations ORDER BY sort_order, label`,
+    sql<LocationOption[]>`SELECT id, key, label, color_token AS "colorToken", is_quick AS "isQuick", quick_code AS "quickCode", is_system AS "isSystem", counts_as_present AS "countsAsPresent", sort_order AS "sortOrder" FROM locations ORDER BY sort_order, label`,
     sql<Array<Omit<LocationGroup, "locationKeys">>>`SELECT id, label, color_token AS "colorToken", enabled, sort_order AS "sortOrder" FROM location_groups ORDER BY sort_order, label`,
     sql<DbLocationGroupMember[]>`SELECT group_id AS "groupId", location_key AS "locationKey", member_order AS "memberOrder" FROM location_group_members ORDER BY group_id, member_order, location_key`,
     sql<Array<{ config: unknown }>>`SELECT config FROM overview_settings WHERE id = ${OVERVIEW_SETTINGS_ID}`,
@@ -97,25 +97,36 @@ export async function changePostgresPeopleLocations(personIds: string[], to: str
     `;
     if (rows.length !== ids.length) throw new Error("PERSON_NOT_FOUND");
 
-    const changed: Array<{ personId: string; name: string; from: string; to: string }> = [];
-    for (const current of rows) {
-      if (current.location === location) continue;
-      await transaction`UPDATE people SET location = ${location}, updated_at = now() WHERE id = ${current.id}`;
-      await transaction`
-        INSERT INTO movement_logs (id, person_id, name, from_value, to_value)
-        VALUES (${randomUUID()}, ${current.id}, ${current.name}, ${current.location}, ${location})
-      `;
-      changed.push({
+    const toChange = rows.filter((current) => current.location !== location);
+    if (!toChange.length) {
+      return { changed: [] as Array<{ personId: string; name: string; from: string; to: string }> };
+    }
+
+    const changeIds = toChange.map((current) => current.id);
+    await transaction`
+      UPDATE people
+      SET location = ${location}, updated_at = now()
+      WHERE id = ANY(${sql.array(changeIds)})
+    `;
+
+    const logRows = toChange.map((current) => ({
+      id: randomUUID(),
+      person_id: current.id,
+      name: current.name,
+      from_value: current.location,
+      to_value: location,
+    }));
+    await transaction`INSERT INTO movement_logs ${transaction(logRows)}`;
+    await transaction`DELETE FROM movement_logs WHERE id IN (SELECT id FROM movement_logs ORDER BY occurred_at DESC OFFSET ${MAX_LOG_ENTRIES})`;
+
+    return {
+      changed: toChange.map((current) => ({
         personId: current.id,
         name: current.name,
         from: current.location,
         to: location,
-      });
-    }
-    if (changed.length) {
-      await transaction`DELETE FROM movement_logs WHERE id IN (SELECT id FROM movement_logs ORDER BY occurred_at DESC OFFSET ${MAX_LOG_ENTRIES})`;
-    }
-    return { changed };
+      })),
+    };
   });
 }
 
@@ -167,10 +178,42 @@ export async function upsertPostgresPlatoon(input: Partial<Platoon> & Pick<Plato
 export async function deletePostgresPlatoon(id: string) { if ((await pg()`SELECT 1 FROM people WHERE platoon_id = ${id} LIMIT 1`).length) throw new Error("PLATOON_IN_USE"); await pg()`DELETE FROM platoons WHERE id = ${id}`; }
 export async function upsertPostgresLocation(input: Partial<LocationOption> & Pick<LocationOption, "label">) {
   const sql = pg();
-  const existing = input.id ? (await sql<Array<{ key: string }>>`SELECT key FROM locations WHERE id = ${input.id}`)[0] : undefined;
-  const record = { id: input.id ?? randomUUID(), key: input.key?.trim() || existing?.key || slug(input.label), label: input.label.trim(), colorToken: input.colorToken ?? "neutral", isQuick: input.isQuick ?? false, quickCode: input.quickCode?.trim() || null, isSystem: input.isSystem ?? false, sortOrder: input.sortOrder ?? Date.now() };
+  const existing = input.id
+    ? (await sql<Array<{ key: string; countsAsPresent: boolean }>>`
+        SELECT key, counts_as_present AS "countsAsPresent" FROM locations WHERE id = ${input.id}
+      `)[0]
+    : undefined;
+  const record = {
+    id: input.id ?? randomUUID(),
+    key: input.key?.trim() || existing?.key || slug(input.label),
+    label: input.label.trim(),
+    colorToken: input.colorToken ?? "neutral",
+    isQuick: input.isQuick ?? false,
+    quickCode: input.quickCode?.trim() || null,
+    isSystem: input.isSystem ?? false,
+    countsAsPresent: input.countsAsPresent ?? existing?.countsAsPresent ?? false,
+    sortOrder: input.sortOrder ?? Date.now(),
+  };
   return inPostgresTransaction(async (transaction) => {
-    const rows = await transaction<LocationOption[]>`INSERT INTO locations (id, key, label, color_token, is_quick, quick_code, is_system, sort_order) VALUES (${record.id}, ${record.key}, ${record.label}, ${record.colorToken}, ${record.isQuick}, ${record.quickCode}, ${record.isSystem}, ${record.sortOrder}) ON CONFLICT (id) DO UPDATE SET key = EXCLUDED.key, label = EXCLUDED.label, color_token = EXCLUDED.color_token, is_quick = EXCLUDED.is_quick, quick_code = EXCLUDED.quick_code, is_system = EXCLUDED.is_system, sort_order = EXCLUDED.sort_order RETURNING id, key, label, color_token AS "colorToken", is_quick AS "isQuick", quick_code AS "quickCode", is_system AS "isSystem", sort_order AS "sortOrder"`;
+    const rows = await transaction<LocationOption[]>`
+      INSERT INTO locations (id, key, label, color_token, is_quick, quick_code, is_system, counts_as_present, sort_order)
+      VALUES (
+        ${record.id}, ${record.key}, ${record.label}, ${record.colorToken}, ${record.isQuick},
+        ${record.quickCode}, ${record.isSystem}, ${record.countsAsPresent}, ${record.sortOrder}
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        key = EXCLUDED.key,
+        label = EXCLUDED.label,
+        color_token = EXCLUDED.color_token,
+        is_quick = EXCLUDED.is_quick,
+        quick_code = EXCLUDED.quick_code,
+        is_system = EXCLUDED.is_system,
+        counts_as_present = EXCLUDED.counts_as_present,
+        sort_order = EXCLUDED.sort_order
+      RETURNING
+        id, key, label, color_token AS "colorToken", is_quick AS "isQuick", quick_code AS "quickCode",
+        is_system AS "isSystem", counts_as_present AS "countsAsPresent", sort_order AS "sortOrder"
+    `;
     if (existing && existing.key !== record.key) {
       await transaction`UPDATE people SET location = ${record.key}, updated_at = now() WHERE location = ${existing.key}`;
       await transaction`UPDATE location_group_members SET location_key = ${record.key} WHERE location_key = ${existing.key}`;

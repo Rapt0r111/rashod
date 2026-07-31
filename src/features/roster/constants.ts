@@ -9,6 +9,7 @@ export const SYSTEM_LOCATIONS: LocationOption[] = [
     isQuick: true,
     quickCode: "Р",
     isSystem: true,
+    countsAsPresent: true,
     sortOrder: 10,
   },
   {
@@ -19,6 +20,7 @@ export const SYSTEM_LOCATIONS: LocationOption[] = [
     isQuick: true,
     quickCode: "Т",
     isSystem: true,
+    countsAsPresent: false,
     sortOrder: 20,
   },
   {
@@ -29,6 +31,7 @@ export const SYSTEM_LOCATIONS: LocationOption[] = [
     isQuick: true,
     quickCode: "С",
     isSystem: true,
+    countsAsPresent: false,
     sortOrder: 30,
   },
   {
@@ -39,6 +42,7 @@ export const SYSTEM_LOCATIONS: LocationOption[] = [
     isQuick: true,
     quickCode: "Н",
     isSystem: true,
+    countsAsPresent: false,
     sortOrder: 40,
   },
   {
@@ -49,6 +53,7 @@ export const SYSTEM_LOCATIONS: LocationOption[] = [
     isQuick: false,
     quickCode: null,
     isSystem: true,
+    countsAsPresent: false,
     sortOrder: 50,
   },
   {
@@ -59,6 +64,7 @@ export const SYSTEM_LOCATIONS: LocationOption[] = [
     isQuick: false,
     quickCode: null,
     isSystem: true,
+    countsAsPresent: false,
     sortOrder: 60,
   },
   {
@@ -69,6 +75,7 @@ export const SYSTEM_LOCATIONS: LocationOption[] = [
     isQuick: false,
     quickCode: null,
     isSystem: true,
+    countsAsPresent: false,
     sortOrder: 70,
   },
   {
@@ -79,6 +86,7 @@ export const SYSTEM_LOCATIONS: LocationOption[] = [
     isQuick: false,
     quickCode: null,
     isSystem: true,
+    countsAsPresent: false,
     sortOrder: 80,
   },
 ];

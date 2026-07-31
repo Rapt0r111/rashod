@@ -24,6 +24,7 @@ export function MainContent(props: {
   locations: LocationOption[];
   onSection: (key: string) => void;
   onLocationFilter: (keys: string[]) => void;
+  onPlatoonLocation?: (platoonId: string, locationKey: string) => void;
   onCustomizeOverview: () => void;
   onLocation: (person: Person, to: string) => void;
   canWrite: boolean;
@@ -59,6 +60,7 @@ export function MainContent(props: {
         ui={state.ui}
         onSection={props.onSection}
         onLocationFilter={props.onLocationFilter}
+        onPlatoonLocation={props.onPlatoonLocation}
         onCustomizeOverview={props.onCustomizeOverview}
         canCustomizeOverview={props.canCustomizeOverview}
         dispatch={props.dispatch}

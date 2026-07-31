@@ -4,7 +4,15 @@ import { SearchSortControl, type SearchSortOption } from "@/components/search-so
 import { useDialogFocus } from "@/components/use-dialog-focus";
 import type { LocationOption, LogEntry, Person } from "../types";
 import type { ToastBatch } from "../state";
-import { abbreviateName, conscriptionLabel, cx, locationLabel, locationToken, relativeTime } from "../utils";
+import {
+  abbreviateName,
+  conscriptionLabel,
+  cx,
+  formatLocationDeltas,
+  locationLabel,
+  locationToken,
+  relativeTime,
+} from "../utils";
 import { Avatar, toneClasses } from "./person-views";
 import { filterListItems, sortListItems, type ListSortState } from "@/components/list-utils";
 
@@ -131,6 +139,71 @@ export function BatchLocationSheet({
   );
 }
 
+export function BatchConfirmDialog({
+  open,
+  count,
+  toLabel,
+  fromSummary,
+  pending,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  count: number;
+  toLabel: string;
+  fromSummary?: string;
+  pending?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const panelRef = useDialogFocus(onCancel, { open });
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-55 grid place-items-center bg-bg-overlay backdrop-blur-[10px]"
+      onMouseDown={onCancel}
+    >
+      <section
+        ref={panelRef}
+        className="m-4 w-[min(420px,calc(100vw-24px))] rounded-[20px] border border-line-strong bg-[color-mix(in_oklch,var(--bg-base)_92%,transparent)] p-4.5 shadow-[0_30px_90px_rgb(0_0_0/0.55)]"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="batch-confirm-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <h2 className="m-0 text-lg" id="batch-confirm-title">
+          Подтвердить перевод
+        </h2>
+        <p className="mt-2 mb-0 text-sm text-text-secondary">
+          Перевести <strong className="text-text-primary">{count} чел.</strong> в{" "}
+          <strong className="text-text-primary">{toLabel}</strong>?
+        </p>
+        {fromSummary && (
+          <p className="mt-2 mb-0 text-xs text-text-muted">{fromSummary}</p>
+        )}
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            className="min-h-11 rounded-xl border border-line bg-white/5 px-3 font-bold text-text-secondary"
+            onClick={onCancel}
+            disabled={pending}
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            className="min-h-11 rounded-xl border border-accent-line bg-accent-soft px-3 font-bold text-text-primary disabled:opacity-55"
+            onClick={onConfirm}
+            disabled={pending}
+          >
+            Перевести
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export function HistoryPanel({
   open,
   logs,
@@ -227,6 +300,7 @@ export function Toast({
   if (!batch) return null;
   const changes = Array.from(batch.changes.values());
   const single = changes.length === 1 ? changes[0] : null;
+  const deltas = !single ? formatLocationDeltas(changes, locations) : "";
   return (
     <div className="fixed bottom-5 left-1/2 z-70 flex max-w-[calc(100vw-24px)] -translate-x-1/2 flex-wrap items-center gap-2.5 rounded-2xl border border-line-strong bg-[color-mix(in_oklch,var(--bg-base)_90%,transparent)] px-3 py-2.5 shadow-(--shadow)" role="status" aria-live="polite">
       <span
@@ -241,6 +315,7 @@ export function Toast({
         {single ? abbreviateName(single.name) : `Изменено: ${changes.length} чел.`}
       </strong>
       {single && <span className="text-text-muted">{locationLabel(single.to, locations)}</span>}
+      {deltas && <span className="text-xs text-text-muted">{deltas}</span>}
       <button className="inline-flex min-h-8.5 items-center gap-1.5 rounded-xl border border-accent-line bg-accent-soft px-3.5 font-bold text-text-primary" type="button" onClick={onUndo}>
         <ArrowCounterClockwiseIcon size={16} />
         Отменить

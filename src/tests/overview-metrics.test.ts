@@ -2,14 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   overviewLocationMetrics,
   platoonLocationMatrix,
+  presentLocationKeys,
   rosterBalance,
 } from "@/features/roster/roster-metrics";
 import type { LocationGroup, LocationOption, Person, Platoon } from "@/features/roster/types";
+import { formatLocationDeltas } from "@/features/roster/utils";
 
 const locations: LocationOption[] = [
-  { id: "rota", key: "rota", label: "Рота", colorToken: "green", isQuick: true, quickCode: "Р", isSystem: true, sortOrder: 10 },
-  { id: "naryad", key: "naryad", label: "Наряд", colorToken: "cyan", isQuick: true, quickCode: "Н", isSystem: true, sortOrder: 20 },
-  { id: "technopark", key: "technopark", label: "Технопарк", colorToken: "blue", isQuick: true, quickCode: "Т", isSystem: true, sortOrder: 30 },
+  { id: "rota", key: "rota", label: "Рота", colorToken: "green", isQuick: true, quickCode: "Р", isSystem: true, countsAsPresent: true, sortOrder: 10 },
+  { id: "naryad", key: "naryad", label: "Наряд", colorToken: "cyan", isQuick: true, quickCode: "Н", isSystem: true, countsAsPresent: false, sortOrder: 20 },
+  { id: "technopark", key: "technopark", label: "Технопарк", colorToken: "blue", isQuick: true, quickCode: "Т", isSystem: true, countsAsPresent: false, sortOrder: 30 },
 ];
 
 function person(id: string, location: string): Person {
@@ -91,7 +93,7 @@ describe("roster balance", () => {
       person("3", "naryad"),
       person("4", "technopark"),
     ];
-    const balance = rosterBalance(people);
+    const balance = rosterBalance(people, presentLocationKeys(locations));
     expect(balance).toEqual({
       total: 4,
       present: 2,
@@ -99,6 +101,36 @@ describe("roster balance", () => {
       presentPct: 50,
     });
     expect(balance.present + balance.away).toBe(balance.total);
+  });
+
+  it("honors multiple countsAsPresent locations", () => {
+    const withNaryadPresent: LocationOption[] = locations.map((location) =>
+      location.key === "naryad" ? { ...location, countsAsPresent: true } : location,
+    );
+    const people = [
+      person("1", "rota"),
+      person("2", "naryad"),
+      person("3", "technopark"),
+    ];
+    const balance = rosterBalance(people, presentLocationKeys(withNaryadPresent));
+    expect(balance.present).toBe(2);
+    expect(balance.away).toBe(1);
+  });
+});
+
+describe("location deltas", () => {
+  it("formats net from/to counts for batch toast", () => {
+    const text = formatLocationDeltas(
+      [
+        { from: "rota", to: "naryad" },
+        { from: "rota", to: "naryad" },
+        { from: "technopark", to: "rota" },
+      ],
+      locations,
+    );
+    expect(text).toContain("Рота -1");
+    expect(text).toContain("Наряд +2");
+    expect(text).toContain("Технопарк -1");
   });
 });
 

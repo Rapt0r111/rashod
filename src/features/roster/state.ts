@@ -22,6 +22,10 @@ export type State = Snapshot & { ui: UiState; flashPersonId: string | null };
 
 export type Action =
   | { type: "snapshot"; snapshot: Snapshot; preserveUi?: boolean }
+  | {
+      type: "patchPeopleLocations";
+      patches: Array<{ personId: string; location: string }>;
+    }
   | { type: "section"; key: string }
   | { type: "search"; value: string }
   | { type: "locationFilter"; value: string | null }
@@ -65,6 +69,22 @@ export function reducer(state: State, action: Action): State {
         flashPersonId: state?.flashPersonId ?? null,
         ui: action.preserveUi ? state.ui : initialUi,
       };
+    case "patchPeopleLocations": {
+      if (!action.patches.length) return state;
+      const map = new Map(
+        action.patches.map((patch) => [patch.personId, patch.location]),
+      );
+      const now = Date.now();
+      return {
+        ...state,
+        people: state.people.map((person) => {
+          const location = map.get(person.id);
+          return location !== undefined
+            ? { ...person, location, updatedAt: now }
+            : person;
+        }),
+      };
+    }
     case "section":
       return {
         ...state,

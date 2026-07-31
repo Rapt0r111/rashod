@@ -112,17 +112,39 @@ export function peopleForPlatoon(people: Person[], platoonId: string) {
   return people.filter((person) => person.platoonId === platoonId);
 }
 
+/** @deprecated Prefer countPresent with presentLocationKeys(locations). */
 export function countInRota(people: Person[]) {
-  return people.filter((person) => person.location === "rota").length;
+  return countPresent(people, ["rota"]);
 }
 
-/** Alias kept for call sites; present keys default to rota. */
+/** Count people whose location is in the present set (default: rota). */
 export function countPresent(
   people: Person[],
   presentKeys: readonly string[] = ["rota"],
 ) {
   const keys = new Set(presentKeys);
   return people.filter((person) => keys.has(person.location)).length;
+}
+
+/** Compact «Рота +3 · Наряд −2» delta for batch toasts. */
+export function formatLocationDeltas(
+  changes: Array<{ from: string; to: string }>,
+  locations: LocationOption[],
+) {
+  if (!changes.length) return "";
+  const delta = new Map<string, number>();
+  for (const change of changes) {
+    delta.set(change.from, (delta.get(change.from) ?? 0) - 1);
+    delta.set(change.to, (delta.get(change.to) ?? 0) + 1);
+  }
+  return [...delta.entries()]
+    .filter(([, count]) => count !== 0)
+    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]) || a[0].localeCompare(b[0], "ru"))
+    .map(([key, count]) => {
+      const label = locationLabel(key, locations);
+      return `${label} ${count > 0 ? `+${count}` : String(count)}`;
+    })
+    .join(" · ");
 }
 
 export function formatDateLabel(date = new Date()) {

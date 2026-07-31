@@ -26,7 +26,8 @@ export const platoons = pgTable("platoons", {
 });
 export const locations = pgTable("locations", {
   id: id(), key: text("key").notNull().unique(), label: text("label").notNull(), colorToken: text("color_token").notNull(),
-  isQuick: boolean("is_quick").notNull().default(false), quickCode: text("quick_code"), isSystem: boolean("is_system").notNull().default(false), sortOrder: bigint("sort_order", { mode: "number" }).notNull(),
+  isQuick: boolean("is_quick").notNull().default(false), quickCode: text("quick_code"), isSystem: boolean("is_system").notNull().default(false),
+  countsAsPresent: boolean("counts_as_present").notNull().default(false), sortOrder: bigint("sort_order", { mode: "number" }).notNull(),
 });
 export const locationGroups = pgTable("location_groups", {
   id: id(), label: text("label").notNull(), colorToken: text("color_token").notNull(), enabled: boolean("enabled").notNull().default(true), sortOrder: bigint("sort_order", { mode: "number" }).notNull(), createdAt: createdAt(), updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

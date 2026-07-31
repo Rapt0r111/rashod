@@ -23,6 +23,7 @@ export function LocationAdmin({
     colorToken: "neutral",
     isQuick: false,
     quickCode: "",
+    countsAsPresent: false,
   });
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<ListSortState>({ key: "alpha", direction: "asc" });
@@ -50,6 +51,7 @@ export function LocationAdmin({
         colorToken: "neutral",
         isQuick: false,
         quickCode: "",
+        countsAsPresent: false,
       });
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Локация не сохранена"));
@@ -102,6 +104,11 @@ export function LocationAdmin({
           label="Быстрая"
           onChange={(checked) => setForm({ ...form, isQuick: checked })}
         />
+        <StyledCheckbox
+          checked={form.countsAsPresent}
+          label="В расположении"
+          onChange={(checked) => setForm({ ...form, countsAsPresent: checked })}
+        />
         <input className={fieldClass}
           aria-label="Код"
           placeholder="Код"
@@ -135,7 +142,7 @@ export function LocationAdmin({
           <AdminRow
             key={item.id}
             title={item.label}
-            meta={`${item.colorToken}${item.isQuick ? `, ${item.quickCode}` : ""}`}
+            meta={`${item.colorToken}${item.isQuick ? `, ${item.quickCode}` : ""}${item.countsAsPresent ? ", налицо" : ""}`}
             onEdit={() => {
               setEditing(item);
               setForm({
@@ -143,6 +150,7 @@ export function LocationAdmin({
                 colorToken: item.colorToken,
                 isQuick: item.isQuick,
                 quickCode: item.quickCode ?? "",
+                countsAsPresent: item.countsAsPresent,
               });
             }}
             onDelete={item.isSystem ? undefined : () => remove(item.id)}

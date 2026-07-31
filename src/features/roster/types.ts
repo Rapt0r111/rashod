@@ -28,6 +28,8 @@ export type LocationOption = {
   isQuick: boolean;
   quickCode: string | null;
   isSystem: boolean;
+  /** Counts toward «в расположении / налицо». */
+  countsAsPresent: boolean;
   sortOrder: number;
 };
 
