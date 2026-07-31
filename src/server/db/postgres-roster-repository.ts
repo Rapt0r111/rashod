@@ -77,6 +77,48 @@ export async function changePostgresPersonLocation(personId: string, to: string,
   });
 }
 
+/** Move many people to one location in a single transaction (one SSE burst). */
+export async function changePostgresPeopleLocations(personIds: string[], to: string) {
+  const location = to.trim();
+  if (!location) throw new Error("LOCATION_REQUIRED");
+  const ids = [...new Set(personIds.map((id) => id.trim()).filter(Boolean))];
+  if (!ids.length) {
+    return { changed: [] as Array<{ personId: string; name: string; from: string; to: string }> };
+  }
+
+  return inPostgresTransaction(async (transaction) => {
+    const sql = pg();
+    if (!(await transaction`SELECT 1 FROM locations WHERE key = ${location}`).length) {
+      throw new Error("LOCATION_NOT_FOUND");
+    }
+    const rows = await transaction<DbPerson[]>`
+      SELECT id, platoon_id AS "platoonId", rank, name, conscription_number AS "conscriptionNumber", location, sort_order AS "sortOrder", created_at, updated_at
+      FROM people WHERE id = ANY(${sql.array(ids)}) FOR UPDATE
+    `;
+    if (rows.length !== ids.length) throw new Error("PERSON_NOT_FOUND");
+
+    const changed: Array<{ personId: string; name: string; from: string; to: string }> = [];
+    for (const current of rows) {
+      if (current.location === location) continue;
+      await transaction`UPDATE people SET location = ${location}, updated_at = now() WHERE id = ${current.id}`;
+      await transaction`
+        INSERT INTO movement_logs (id, person_id, name, from_value, to_value)
+        VALUES (${randomUUID()}, ${current.id}, ${current.name}, ${current.location}, ${location})
+      `;
+      changed.push({
+        personId: current.id,
+        name: current.name,
+        from: current.location,
+        to: location,
+      });
+    }
+    if (changed.length) {
+      await transaction`DELETE FROM movement_logs WHERE id IN (SELECT id FROM movement_logs ORDER BY occurred_at DESC OFFSET ${MAX_LOG_ENTRIES})`;
+    }
+    return { changed };
+  });
+}
+
 export async function undoPostgresLocations(changes: Array<{ personId: string; location: string }>) {
   await inPostgresTransaction(async (transaction) => {
     for (const change of changes) {

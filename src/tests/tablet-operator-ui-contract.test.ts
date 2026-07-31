@@ -31,9 +31,11 @@ describe("Tablet operator workflow contract", () => {
     expect(people).toContain("min-h-11 min-w-11");
     expect(people).toContain("disabled={pending || person.location === location.key}");
     expect(people).toContain("aria-label={`Перевести ${person.name} в ${location.label}`}");
-    expect(app).toContain("pendingLocationPersonId");
-    expect(app).toContain("if (pendingLocationPersonId === person.id || person.location === to) return;");
+    expect(app).toContain("pendingLocationIds");
+    expect(app).toContain("if (pendingLocationIds.has(person.id) || person.location === to) return;");
     expect(app).toContain("Не удалось изменить местоположение");
+    expect(app).toContain("personIds");
+    expect(app).toContain("applyLocationBatch");
   });
 
   it("keeps the polished roster rail quiet and recognizable", () => {

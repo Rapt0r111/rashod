@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { overviewLocationMetrics } from "@/features/roster/roster-metrics";
-import type { LocationGroup, LocationOption, Person } from "@/features/roster/types";
+import {
+  overviewLocationMetrics,
+  platoonLocationMatrix,
+  rosterBalance,
+} from "@/features/roster/roster-metrics";
+import type { LocationGroup, LocationOption, Person, Platoon } from "@/features/roster/types";
 
 const locations: LocationOption[] = [
   { id: "rota", key: "rota", label: "Рота", colorToken: "green", isQuick: true, quickCode: "Р", isSystem: true, sortOrder: 10 },
@@ -76,5 +80,46 @@ describe("overview location metrics", () => {
     expect(metrics.some((item) => item.key === "group:1")).toBe(false);
     expect(metrics.find((item) => item.key === "location:rota")?.count).toBe(1);
     expect(metrics.find((item) => item.key === "location:rota")?.locationKeys).toEqual(["rota"]);
+  });
+});
+
+describe("roster balance", () => {
+  it("splits list into present and away with invariant total", () => {
+    const people = [
+      person("1", "rota"),
+      person("2", "rota"),
+      person("3", "naryad"),
+      person("4", "technopark"),
+    ];
+    const balance = rosterBalance(people);
+    expect(balance).toEqual({
+      total: 4,
+      present: 2,
+      away: 2,
+      presentPct: 50,
+    });
+    expect(balance.present + balance.away).toBe(balance.total);
+  });
+});
+
+describe("platoon location matrix", () => {
+  it("counts people by platoon and location for drill-down", () => {
+    const platoons: Platoon[] = [
+      { id: "p1", key: "vz1", label: "1 взвод", sortOrder: 10, isSystem: true },
+      { id: "p2", key: "vz2", label: "2 взвод", sortOrder: 20, isSystem: true },
+    ];
+    const people: Person[] = [
+      { ...person("1", "rota"), platoonId: "p1" },
+      { ...person("2", "naryad"), platoonId: "p1" },
+      { ...person("3", "rota"), platoonId: "p2" },
+    ];
+    const matrix = platoonLocationMatrix(people, platoons, locations);
+    expect(matrix.grandTotal).toBe(3);
+    expect(matrix.locationKeys).toEqual(["rota", "naryad"]);
+    expect(matrix.rows.find((row) => row.platoon.id === "p1")?.byLocation).toEqual({
+      rota: 1,
+      naryad: 1,
+    });
+    expect(matrix.columnTotals.rota).toBe(2);
   });
 });

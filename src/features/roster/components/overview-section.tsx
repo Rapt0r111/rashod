@@ -23,7 +23,11 @@ import {
   filterPeopleByRosterFilters,
   selectedFilterKeys,
 } from "../utils";
-import { locationsAndCustom, overviewLocationMetrics } from "../roster-metrics";
+import {
+  locationsAndCustom,
+  overviewLocationMetrics,
+  rosterBalance,
+} from "../roster-metrics";
 import { normalizeOverviewSettings, overviewBlock } from "../overview-settings";
 import { toneClasses } from "./person-views";
 import {
@@ -181,9 +185,10 @@ export function Overview({
     () => Math.max(1, ...selectedLocationCards.map((item) => item.count)),
     [selectedLocationCards],
   );
-  const total = filteredPeople.length;
-  const present = useMemo(() => countInRota(filteredPeople), [filteredPeople]);
-  const presentPct = total === 0 ? 0 : Math.round((present / total) * 100);
+  const balance = useMemo(() => rosterBalance(filteredPeople), [filteredPeople]);
+  const total = balance.total;
+  const present = balance.present;
+  const presentPct = balance.presentPct;
   const peakLoc = useMemo(
     () =>
       allLocationMetrics

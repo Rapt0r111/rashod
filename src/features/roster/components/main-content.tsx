@@ -1,5 +1,5 @@
 import type { Dispatch } from "react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import type { LocationOption, Person, Platoon } from "../types";
 import type { Action, State } from "../state";
 import { filterPeople } from "../utils";
@@ -12,6 +12,9 @@ import {
   PlatoonSection,
   SectionHeader,
 } from "./roster-sections";
+import type { SelectionProps } from "./selection-types";
+
+export type { SelectionProps };
 
 export function MainContent(props: {
   state: State;
@@ -23,12 +26,12 @@ export function MainContent(props: {
   onLocationFilter: (keys: string[]) => void;
   onCustomizeOverview: () => void;
   onLocation: (person: Person, to: string) => void;
-  pendingPersonId?: string | null;
   canWrite: boolean;
   canCustomizeOverview: boolean;
   dispatch: Dispatch<Action>;
+  selection: SelectionProps;
 }) {
-  const { state, people, allPeople, platoons, locations } = props;
+  const { state, people, allPeople, platoons, locations, selection } = props;
   if (state.ui.searchQuery.trim())
     return (
       <SearchResults
@@ -38,9 +41,9 @@ export function MainContent(props: {
         platoons={platoons}
         locations={locations}
         onLocation={props.onLocation}
-        pendingPersonId={props.pendingPersonId}
         canWrite={props.canWrite}
         dispatch={props.dispatch}
+        selection={selection}
       />
     );
   if (state.ui.activeSection === "overview")
@@ -69,9 +72,9 @@ export function MainContent(props: {
         platoons={platoons}
         locations={locations}
         onLocation={props.onLocation}
-        pendingPersonId={props.pendingPersonId}
         canWrite={props.canWrite}
         dispatch={props.dispatch}
+        selection={selection}
       />
     );
   const platoon =
@@ -85,6 +88,7 @@ export function MainContent(props: {
       onLocation={props.onLocation}
       canWrite={props.canWrite}
       dispatch={props.dispatch}
+      selection={selection}
     />
   );
 }
@@ -96,9 +100,9 @@ function SearchResults({
   platoons,
   locations,
   onLocation,
-  pendingPersonId,
   canWrite,
   dispatch,
+  selection,
 }: {
   query: string;
   state: State;
@@ -106,9 +110,9 @@ function SearchResults({
   platoons: Platoon[];
   locations: LocationOption[];
   onLocation: (person: Person, to: string) => void;
-  pendingPersonId?: string | null;
   canWrite: boolean;
   dispatch: Dispatch<Action>;
+  selection: SelectionProps;
 }) {
   const platoonLabels = useMemo(
     () => new Map(platoons.map((platoon) => [platoon.id, platoon.label])),
@@ -128,6 +132,11 @@ function SearchResults({
     [dispatch],
   );
 
+  const resultIds = useMemo(() => results.map((person) => person.id), [results]);
+  useEffect(() => {
+    selection.onVisiblePeopleChange?.(resultIds);
+  }, [resultIds, selection]);
+
   return (
     <section className="mx-auto grid w-full min-w-0 max-w-[1640px] gap-4.5 max-[1180px]:gap-4">
       <SectionHeader
@@ -143,8 +152,10 @@ function SearchResults({
               locations={locations}
               contextLabel={platoonLabels.get(person.platoonId)}
               flash={state.flashPersonId === person.id}
-              pending={pendingPersonId === person.id}
+              pending={selection.pendingIds.has(person.id)}
               canWrite={canWrite}
+              selected={selection.selectedIds.has(person.id)}
+              onToggleSelect={selection.onToggleSelect}
               onLocation={onLocation}
               onMore={handleOpenSheet}
             />
@@ -156,4 +167,3 @@ function SearchResults({
     </section>
   );
 }
-

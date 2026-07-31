@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
+  changePostgresPeopleLocations as changePeopleLocations,
   changePostgresPersonLocation as changePersonLocation,
   getPostgresPeopleByIds as getPeopleByIds,
   getPostgresSnapshot as getSnapshot,
@@ -12,6 +13,10 @@ import { apiError, idString, parseJson, runAuditedMutation, shortText, uniqueArr
 
 const changeSchema = z.object({
   personId: idString,
+  to: shortText(120),
+});
+const batchSchema = z.object({
+  personIds: uniqueArray(idString, 500),
   to: shortText(120),
 });
 const undoSchema = z.object({
@@ -29,7 +34,7 @@ export async function POST(request: Request) {
   const auth = await requirePermission(request, "roster:write");
   if (auth instanceof NextResponse) return auth;
   try {
-    const body = await parseJson(request, z.union([undoSchema, changeSchema]));
+    const body = await parseJson(request, z.union([undoSchema, batchSchema, changeSchema]));
     if ("undo" in body) {
       const parsed = undoSchema.parse(body);
       const snapshot = await runAuditedMutation(
@@ -42,6 +47,20 @@ export async function POST(request: Request) {
         { count: parsed.undo.length },
       );
       publishRosterChanged("undo");
+      return NextResponse.json(snapshot);
+    }
+    if ("personIds" in body) {
+      const parsed = batchSchema.parse(body);
+      const snapshot = await runAuditedMutation(
+        auth,
+        "roster.location.batch",
+        async () => {
+          const result = await changePeopleLocations(parsed.personIds, parsed.to);
+          return { ...(await getSnapshot()), changed: result.changed };
+        },
+        { count: parsed.personIds.length, to: parsed.to },
+      );
+      publishRosterChanged("location-change");
       return NextResponse.json(snapshot);
     }
     const parsed = changeSchema.parse(body);

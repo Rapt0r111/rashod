@@ -8,31 +8,40 @@ import { toneClasses } from "./person-views";
 
 export const OperatorBar = memo(function OperatorBar({
   people,
+  total,
   locations,
   locationGroups,
-  total,
-  rota,
   query,
   sort,
   error,
   onQueryChange,
   onSortChange,
   onLocationFilter,
+  onResetFilters,
 }: {
   people: Person[];
+  /** Full roster size — not affected by active filters. */
+  total: number;
   locations: LocationOption[];
   locationGroups: LocationGroup[];
-  total: number;
-  rota: number;
   query: string;
   sort: ListSortState;
   error?: string | null;
   onQueryChange: (value: string) => void;
   onSortChange: (value: ListSortState) => void;
   onLocationFilter: (keys: string[]) => void;
+  onResetFilters: () => void;
 }) {
   const distribution = useMemo(
-    () => overviewLocationMetrics(people, locations, locationGroups).filter((item) => item.count > 0),
+    () =>
+      overviewLocationMetrics(people, locations, locationGroups)
+        .filter((item) => item.count > 0)
+        .sort(
+          (a, b) =>
+            b.count - a.count ||
+            a.sortOrder - b.sortOrder ||
+            a.label.localeCompare(b.label, "ru"),
+        ),
     [people, locations, locationGroups],
   );
 
@@ -46,14 +55,16 @@ export const OperatorBar = memo(function OperatorBar({
         aria-live="polite"
         aria-label="Распределение по местам"
       >
-        <div className="flex h-11 shrink-0 items-center gap-2 rounded-xl border border-accent-line bg-accent-soft px-3">
+        <button
+          type="button"
+          className="flex h-11 shrink-0 items-center gap-2 rounded-xl border border-accent-line bg-accent-soft px-3 transition duration-200 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base"
+          title="Сбросить фильтры и показать весь список"
+          aria-label={`Список ${total}. Сбросить фильтры`}
+          onClick={onResetFilters}
+        >
           <strong className="font-mono text-lg leading-none text-accent">{total}</strong>
-          <span className="text-xs font-semibold text-text-secondary">всего</span>
-        </div>
-        <div className="flex h-11 shrink-0 items-center gap-2 rounded-xl border border-line bg-white/4 px-3">
-          <strong className="font-mono text-lg leading-none text-green">{rota}</strong>
-          <span className="text-xs font-semibold text-text-secondary">в роте</span>
-        </div>
+          <span className="text-xs font-semibold text-text-secondary">список</span>
+        </button>
         <span className="h-7 w-px shrink-0 bg-line" aria-hidden="true" />
         {distribution.map((item) => {
           const tone = toneClasses(item.token);

@@ -25,7 +25,6 @@ export function LocationSheet({
   onClose: () => void;
   onPick: (person: Person, value: string) => void;
 }) {
-  const [custom, setCustom] = useState("");
   const panelRef = useDialogFocus(onClose, { open: open && !!person });
   if (!open || !person) return null;
   return (
@@ -47,7 +46,7 @@ export function LocationSheet({
             {person.conscriptionNumber && <p className="mt-1 mb-0 text-text-muted">{conscriptionLabel(person.conscriptionNumber)}</p>}
           </div>
         </div>
-        <h3 className="my-4.5 mb-2.5 text-[13px] text-text-secondary">Текущее местонахождение</h3>
+        <h3 className="my-4.5 mb-2.5 text-[13px] text-text-secondary">Куда перевести</h3>
         <div className="grid grid-cols-2 gap-2 max-[720px]:grid-cols-1">
           {locations.map((location) => (
             <button
@@ -58,6 +57,7 @@ export function LocationSheet({
                 person.location === location.key ? toneClasses(location.colorToken).border : "border-line",
                 person.location === location.key ? toneClasses(location.colorToken).soft : "bg-white/4",
               )}
+              disabled={person.location === location.key}
               onClick={() => onPick(person, location.key)}
             >
               <span
@@ -67,32 +67,64 @@ export function LocationSheet({
             </button>
           ))}
         </div>
-        <h3 className="my-4.5 mb-2.5 text-[13px] text-text-secondary">Другое место</h3>
-        <label className="grid grid-cols-[1fr_auto] gap-2 max-[720px]:grid-cols-1">
-          <span className="sr-only">Произвольное место</span>
-          <input
-            className="min-h-10.5 min-w-0 w-full rounded-xl border border-line bg-bg-raised px-3 text-text-primary outline-none transition focus:border-cyan focus-visible:ring-2 focus-visible:ring-[color-mix(in_oklch,var(--cyan)_20%,transparent)] disabled:cursor-not-allowed disabled:opacity-55"
-            value={custom}
-            onChange={(event) => setCustom(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && custom.trim())
-                onPick(person, custom.trim());
-            }}
-            placeholder="Например: госпиталь, штаб..."
-          />
-          <button className="min-h-10.5 rounded-xl border border-accent-line bg-accent-soft px-3.5 font-bold text-text-primary disabled:cursor-not-allowed disabled:opacity-55"
-            type="button"
-            disabled={!custom.trim()}
-            onClick={() => {
-              onPick(person, custom.trim());
-              setCustom("");
-            }}
-          >
-            Указать
-          </button>
-        </label>
+        <p className="mt-3 mb-0 text-xs text-text-muted">
+          Только места из справочника. Новые точки добавляет администратор.
+        </p>
         <button className="mt-3 min-h-10.5 w-full rounded-xl border border-accent-line bg-accent-soft px-3.5 font-bold text-text-primary" type="button" onClick={onClose}>
           Закрыть
+        </button>
+      </section>
+    </div>
+  );
+}
+
+export function BatchLocationSheet({
+  count,
+  locations,
+  open,
+  onClose,
+  onPick,
+}: {
+  count: number;
+  locations: LocationOption[];
+  open: boolean;
+  onClose: () => void;
+  onPick: (to: string) => void;
+}) {
+  const panelRef = useDialogFocus(onClose, { open });
+  if (!open || count <= 0) return null;
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-end justify-center bg-bg-overlay backdrop-blur-[10px]" onMouseDown={onClose}>
+      <section
+        ref={panelRef}
+        className="m-3 max-h-[calc(100dvh-28px)] w-[min(560px,calc(100vw-24px))] overflow-auto rounded-[22px] border border-line-strong bg-[color-mix(in_oklch,var(--bg-base)_90%,transparent)] p-4.5 shadow-[0_30px_90px_rgb(0_0_0/0.55)] max-[720px]:m-0 max-[720px]:max-h-[90dvh] max-[720px]:w-full max-[720px]:rounded-b-none"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="batch-location-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="mx-auto mb-3.5 h-1 w-10.5 rounded-full bg-line-strong" />
+        <h2 className="m-0 text-[19px]" id="batch-location-title">
+          Перевести {count} чел.
+        </h2>
+        <p className="mt-1 mb-0 text-sm text-text-muted">Выберите место из справочника</p>
+        <div className="mt-4 grid grid-cols-2 gap-2 max-[720px]:grid-cols-1">
+          {locations.map((location) => (
+            <button
+              type="button"
+              key={location.id}
+              className={cx(
+                "flex min-h-10.5 min-w-0 items-center gap-2 overflow-hidden rounded-[13px] border border-line bg-white/4 px-3 text-left text-text-primary",
+              )}
+              onClick={() => onPick(location.key)}
+            >
+              <span className={cx("h-2 w-2 shrink-0 rounded-full", toneClasses(location.colorToken).bg)} />
+              {location.label}
+            </button>
+          ))}
+        </div>
+        <button className="mt-3 min-h-10.5 w-full rounded-xl border border-accent-line bg-accent-soft px-3.5 font-bold text-text-primary" type="button" onClick={onClose}>
+          Отмена
         </button>
       </section>
     </div>

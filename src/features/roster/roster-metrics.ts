@@ -1,5 +1,103 @@
-import type { LocationGroup, LocationOption, Person } from "./types";
+import type { LocationGroup, LocationOption, Person, Platoon } from "./types";
 import { locationLabel, locationToken } from "./utils";
+
+/** Keys that count as "налицо / в расположении". Default: only rota. */
+export const DEFAULT_PRESENT_LOCATION_KEYS = ["rota"] as const;
+
+export type RosterBalance = {
+  total: number;
+  present: number;
+  away: number;
+  presentPct: number;
+};
+
+export function rosterBalance(
+  people: Person[],
+  presentKeys: readonly string[] = DEFAULT_PRESENT_LOCATION_KEYS,
+): RosterBalance {
+  const presentSet = new Set(presentKeys);
+  let present = 0;
+  for (const person of people) {
+    if (presentSet.has(person.location)) present += 1;
+  }
+  const total = people.length;
+  return {
+    total,
+    present,
+    away: total - present,
+    presentPct: total === 0 ? 0 : Math.round((present / total) * 100),
+  };
+}
+
+export type PlatoonLocationMatrixRow = {
+  platoon: Platoon;
+  total: number;
+  byLocation: Record<string, number>;
+  present: number;
+};
+
+export type PlatoonLocationMatrix = {
+  locationKeys: string[];
+  rows: PlatoonLocationMatrixRow[];
+  columnTotals: Record<string, number>;
+  grandTotal: number;
+};
+
+/** Platoon × location counts for drill-down matrix. Empty locations omitted unless in known list. */
+export function platoonLocationMatrix(
+  people: Person[],
+  platoons: Platoon[],
+  locations: LocationOption[],
+  presentKeys: readonly string[] = DEFAULT_PRESENT_LOCATION_KEYS,
+): PlatoonLocationMatrix {
+  const knownKeys = locations.map((location) => location.key);
+  const usedKeys = new Set<string>();
+  const byPlatoon = new Map<string, Map<string, number>>();
+
+  for (const platoon of platoons) {
+    byPlatoon.set(platoon.id, new Map());
+  }
+
+  for (const person of people) {
+    usedKeys.add(person.location);
+    const map = byPlatoon.get(person.platoonId) ?? new Map<string, number>();
+    map.set(person.location, (map.get(person.location) ?? 0) + 1);
+    byPlatoon.set(person.platoonId, map);
+  }
+
+  const locationKeys = [
+    ...knownKeys.filter((key) => usedKeys.has(key)),
+    ...[...usedKeys].filter((key) => !knownKeys.includes(key)).sort((a, b) => a.localeCompare(b, "ru")),
+  ];
+
+  const presentSet = new Set(presentKeys);
+  const columnTotals: Record<string, number> = Object.fromEntries(locationKeys.map((key) => [key, 0]));
+  let grandTotal = 0;
+
+  const rows: PlatoonLocationMatrixRow[] = platoons.map((platoon) => {
+    const counts = byPlatoon.get(platoon.id) ?? new Map();
+    const byLocation: Record<string, number> = {};
+    let total = 0;
+    let present = 0;
+    for (const key of locationKeys) {
+      const count = counts.get(key) ?? 0;
+      byLocation[key] = count;
+      columnTotals[key] = (columnTotals[key] ?? 0) + count;
+      total += count;
+      if (presentSet.has(key)) present += count;
+    }
+    for (const [key, count] of counts) {
+      if (!locationKeys.includes(key)) {
+        total += count;
+        if (presentSet.has(key)) present += count;
+      }
+    }
+    grandTotal += total;
+    return { platoon, total, byLocation, present };
+  }).filter((row) => row.total > 0);
+
+  return { locationKeys, rows, columnTotals, grandTotal };
+}
 
 export function locationsAndCustom(people: Person[], locations: LocationOption[]) {
   const map = new Map<

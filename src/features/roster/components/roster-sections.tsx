@@ -1,5 +1,5 @@
 import type { Dispatch } from "react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { CollapsibleFilter } from "@/components/collapsible-filter";
 import type { LocationOption, Person, Platoon } from "../types";
 import type { Action, State } from "../state";
@@ -11,6 +11,7 @@ import {
 } from "../utils";
 import { locationsAndCustom } from "../roster-metrics";
 import { sortListItems } from "@/components/list-utils";
+import type { SelectionProps } from "./selection-types";
 import { PersonCard, RosterRow } from "./person-views";
 import {
   EmptyState,
@@ -26,18 +27,18 @@ export function AllPlatoons({
   platoons,
   locations,
   onLocation,
-  pendingPersonId,
   canWrite,
   dispatch,
+  selection,
 }: {
   state: State;
   people: Person[];
   platoons: Platoon[];
   locations: LocationOption[];
   onLocation: (person: Person, to: string) => void;
-  pendingPersonId?: string | null;
   canWrite: boolean;
   dispatch: Dispatch<Action>;
+  selection: SelectionProps;
 }) {
   const selectedPlatoonKeys = selectedFilterKeys(
     state.ui.platoonFilterKeys,
@@ -148,6 +149,13 @@ export function AllPlatoons({
     [people, locations],
   );
   const availableConscriptionNumbers = useMemo(() => conscriptionOptions(people), [people]);
+  const visibleIds = useMemo(
+    () => visibleGroups.flatMap((item) => item.group.map((person) => person.id)),
+    [visibleGroups],
+  );
+  useEffect(() => {
+    selection.onVisiblePeopleChange?.(visibleIds);
+  }, [selection, visibleIds]);
 
   return (
     <section className="mx-auto grid w-full min-w-0 max-w-[1640px] gap-4.5 max-[1180px]:gap-4">
@@ -218,8 +226,10 @@ export function AllPlatoons({
                 person={person}
                 locations={locations}
                 flash={state.flashPersonId === person.id}
-                pending={pendingPersonId === person.id}
+                pending={selection.pendingIds.has(person.id)}
                 canWrite={canWrite}
+                selected={selection.selectedIds.has(person.id)}
+                onToggleSelect={selection.onToggleSelect}
                 onLocation={onLocation}
                 onMore={handleOpenSheet}
               />
@@ -239,6 +249,7 @@ export function PlatoonSection({
   locations,
   canWrite,
   dispatch,
+  selection,
 }: {
   state: State;
   platoon: Platoon;
@@ -247,6 +258,7 @@ export function PlatoonSection({
   onLocation: (person: Person, to: string) => void;
   canWrite: boolean;
   dispatch: Dispatch<Action>;
+  selection: SelectionProps;
 }) {
   const platoonPeople = useMemo(
     () => peopleForPlatoon(people, platoon.id),
@@ -318,6 +330,10 @@ export function PlatoonSection({
     [dispatch],
   );
   const availableConscriptionNumbers = useMemo(() => conscriptionOptions(platoonPeople), [platoonPeople]);
+  const visibleIds = useMemo(() => filtered.map((person) => person.id), [filtered]);
+  useEffect(() => {
+    selection.onVisiblePeopleChange?.(visibleIds);
+  }, [selection, visibleIds]);
 
   return (
     <section className="mx-auto grid w-full min-w-0 max-w-[1640px] gap-4.5 max-[1180px]:gap-4">
@@ -365,6 +381,8 @@ export function PlatoonSection({
             locations={locations}
             flash={state.flashPersonId === person.id}
             canWrite={canWrite}
+            selected={selection.selectedIds.has(person.id)}
+            onToggleSelect={selection.onToggleSelect}
             onClick={handleOpenSheet}
           />
         ))}

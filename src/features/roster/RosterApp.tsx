@@ -17,7 +17,6 @@ import { fetchJson, getApiErrorMessage } from "./api";
 import { useRealtimeDomain } from "@/features/realtime/RealtimeProvider";
 import {
   bySort,
-  countInRota,
   filterPeople,
   filterPeopleByRosterFilters,
 } from "./utils";
@@ -27,7 +26,12 @@ import {
   setRosterHistorySection,
 } from "./navigation-history";
 import type { AdminTab } from "./components/admin-panel";
-import { HistoryPanel, LocationSheet, Toast } from "./components/dialogs";
+import {
+  BatchLocationSheet,
+  HistoryPanel,
+  LocationSheet,
+  Toast,
+} from "./components/dialogs";
 import { MainContent } from "./components/main-content";
 import {
   MobileSectionNav,
@@ -36,6 +40,8 @@ import {
 } from "./components/navigation";
 import { TopBar } from "./components/top-bar";
 import { OperatorBar } from "./components/operator-bar";
+import { SelectionBar } from "./components/selection-bar";
+import type { SelectionProps } from "./components/selection-types";
 import type { TasksSnapshot } from "../tasks/types";
 import { hasPermission, type Permission } from "@/features/auth/permissions";
 import { Loader } from "@/components/loader";
@@ -107,7 +113,12 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
   const [actionError, setActionError] = useState<string | null>(null);
   const groupsRequestRef = useRef<Promise<void> | null>(null);
   const tasksRequestRef = useRef<Promise<void> | null>(null);
-  const [pendingLocationPersonId, setPendingLocationPersonId] = useState<string | null>(null);
+  const [pendingLocationIds, setPendingLocationIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [visiblePersonIds, setVisiblePersonIds] = useState<string[]>([]);
+  const [batchSheetOpen, setBatchSheetOpen] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -144,6 +155,8 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
         dispatch({ type: "history", open: false });
         dispatch({ type: "admin", open: false });
         setMenuOpen(false);
+        setBatchSheetOpen(false);
+        setSelectedIds(new Set());
       }
     };
     window.addEventListener("keydown", onKey);
@@ -279,37 +292,210 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
     toastTimer.current = setTimeout(() => setToastBatch(null), 3200);
   }, []);
 
+  const addToasts = useCallback((changes: ToastChange[]) => {
+    if (!changes.length) return;
+    setToastBatch((current) => {
+      const map = new Map(current?.changes ?? []);
+      for (const change of changes) {
+        const existing = map.get(change.personId);
+        map.set(change.personId, {
+          ...change,
+          from: existing?.from ?? change.from,
+        });
+      }
+      return { changes: map, expiresAt: Date.now() + 4200 };
+    });
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToastBatch(null), 4200);
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+    setBatchSheetOpen(false);
+  }, []);
+
+  const toggleSelect = useCallback((personId: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(personId)) next.delete(personId);
+      else next.add(personId);
+      return next;
+    });
+  }, []);
+
   const applyLocation = useCallback(
     async (person: Person, to: string) => {
       if (!canWriteRoster) return;
-      if (pendingLocationPersonId === person.id || person.location === to) return;
-      setPendingLocationPersonId(person.id);
+      if (pendingLocationIds.has(person.id) || person.location === to) return;
+      setPendingLocationIds((current) => new Set(current).add(person.id));
       setLocationError(null);
+      // Optimistic local update for snappy tablet UX
+      const previousLocation = person.location;
+      dispatch({
+        type: "snapshot",
+        snapshot: {
+          people: state.people.map((item) =>
+            item.id === person.id ? { ...item, location: to, updatedAt: Date.now() } : item,
+          ),
+          platoons: state.platoons,
+          locations: state.locations,
+          locationGroups: state.locationGroups,
+          overviewSettings: state.overviewSettings,
+          changeLog: state.changeLog,
+          serverTime: state.serverTime,
+        },
+        preserveUi: true,
+      });
+      dispatch({ type: "flash", personId: person.id });
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+      flashTimer.current = setTimeout(() => dispatch({ type: "flash", personId: null }), 420);
       try {
         const snapshot = await fetchJson<Snapshot>("/api/location-change", {
           method: "POST",
           body: JSON.stringify({ personId: person.id, to }),
         });
         dispatch({ type: "snapshot", snapshot, preserveUi: true });
-        dispatch({ type: "flash", personId: person.id });
-        if (flashTimer.current) clearTimeout(flashTimer.current);
-        flashTimer.current = setTimeout(() => dispatch({ type: "flash", personId: null }), 420);
         addToast({
           personId: person.id,
           name: person.name,
-          from: person.location,
+          from: previousLocation,
           to,
         });
         dispatch({ type: "closeSheet" });
       } catch (error) {
+        dispatch({
+          type: "snapshot",
+          snapshot: {
+            people: state.people.map((item) =>
+              item.id === person.id
+                ? { ...item, location: previousLocation }
+                : item,
+            ),
+            platoons: state.platoons,
+            locations: state.locations,
+            locationGroups: state.locationGroups,
+            overviewSettings: state.overviewSettings,
+            changeLog: state.changeLog,
+            serverTime: state.serverTime,
+          },
+          preserveUi: true,
+        });
         setLocationError(
           getApiErrorMessage(error, "Не удалось изменить местоположение"),
         );
       } finally {
-        setPendingLocationPersonId(null);
+        setPendingLocationIds((current) => {
+          const next = new Set(current);
+          next.delete(person.id);
+          return next;
+        });
       }
     },
-    [addToast, canWriteRoster, pendingLocationPersonId],
+    [addToast, canWriteRoster, pendingLocationIds, state],
+  );
+
+  const applyLocationBatch = useCallback(
+    async (personIds: string[], to: string) => {
+      if (!canWriteRoster || !personIds.length) return;
+      const targets = state.people.filter(
+        (person) => personIds.includes(person.id) && person.location !== to,
+      );
+      if (!targets.length) {
+        clearSelection();
+        return;
+      }
+      if (
+        targets.length >= 10 &&
+        typeof window !== "undefined" &&
+        !window.confirm(
+          `Перевести ${targets.length} чел. в выбранное место?`,
+        )
+      ) {
+        return;
+      }
+
+      const ids = targets.map((person) => person.id);
+      const previous = new Map(targets.map((person) => [person.id, person.location]));
+      setPendingLocationIds((current) => {
+        const next = new Set(current);
+        for (const id of ids) next.add(id);
+        return next;
+      });
+      setLocationError(null);
+      setBatchSheetOpen(false);
+
+      dispatch({
+        type: "snapshot",
+        snapshot: {
+          people: state.people.map((item) =>
+            previous.has(item.id)
+              ? { ...item, location: to, updatedAt: Date.now() }
+              : item,
+          ),
+          platoons: state.platoons,
+          locations: state.locations,
+          locationGroups: state.locationGroups,
+          overviewSettings: state.overviewSettings,
+          changeLog: state.changeLog,
+          serverTime: state.serverTime,
+        },
+        preserveUi: true,
+      });
+
+      try {
+        const snapshot = await fetchJson<
+          Snapshot & {
+            changed?: Array<{ personId: string; name: string; from: string; to: string }>;
+          }
+        >("/api/location-change", {
+          method: "POST",
+          body: JSON.stringify({ personIds: ids, to }),
+        });
+        dispatch({ type: "snapshot", snapshot, preserveUi: true });
+        const changed =
+          snapshot.changed?.map((item) => ({
+            personId: item.personId,
+            name: item.name,
+            from: item.from,
+            to: item.to,
+          })) ??
+          targets.map((person) => ({
+            personId: person.id,
+            name: person.name,
+            from: previous.get(person.id) ?? person.location,
+            to,
+          }));
+        addToasts(changed);
+        clearSelection();
+      } catch (error) {
+        dispatch({
+          type: "snapshot",
+          snapshot: {
+            people: state.people.map((item) => {
+              const from = previous.get(item.id);
+              return from !== undefined ? { ...item, location: from } : item;
+            }),
+            platoons: state.platoons,
+            locations: state.locations,
+            locationGroups: state.locationGroups,
+            overviewSettings: state.overviewSettings,
+            changeLog: state.changeLog,
+            serverTime: state.serverTime,
+          },
+          preserveUi: true,
+        });
+        setLocationError(
+          getApiErrorMessage(error, "Не удалось изменить местоположение"),
+        );
+      } finally {
+        setPendingLocationIds((current) => {
+          const next = new Set(current);
+          for (const id of ids) next.delete(id);
+          return next;
+        });
+      }
+    },
+    [addToasts, canWriteRoster, clearSelection, state],
   );
 
   async function undoToast() {
@@ -341,6 +527,7 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
       );
     }
     dispatch({ type: "section", key });
+    clearSelection();
     setMenuOpen(false);
     mainRef.current?.scrollTo({ top: 0, behavior: "instant" });
   }
@@ -387,13 +574,20 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
       state.ui.platoonFilterKeys,
     ],
   );
-  const total = operatorPeople.length;
-  const rota = useMemo(() => countInRota(operatorPeople), [operatorPeople]);
   const sectionCounts = {
     groups: groupsSnapshot?.groups.length,
     tasks: tasksSnapshot?.active.length,
   };
   const isRosterSection = state.ui.activeSection !== "groups" && state.ui.activeSection !== "tasks";
+  const selectionProps: SelectionProps = useMemo(
+    () => ({
+      selectedIds,
+      pendingIds: pendingLocationIds,
+      onToggleSelect: toggleSelect,
+      onVisiblePeopleChange: setVisiblePersonIds,
+    }),
+    [pendingLocationIds, selectedIds, toggleSelect],
+  );
 
   return (
     <div className="relative z-1 isolate grid h-dvh w-full max-w-[100vw] grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-bg-base bg-[radial-gradient(circle_at_20%_-10%,oklch(32%_0.12_302/0.28),transparent_36%),radial-gradient(circle_at_86%_14%,oklch(34%_0.11_193/0.18),transparent_30%)]">
@@ -453,10 +647,9 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
           {isRosterSection && (
             <OperatorBar
               people={operatorPeople}
+              total={state.people.length}
               locations={sortedLocations}
               locationGroups={state.locationGroups}
-              total={total}
-              rota={rota}
               query={state.ui.searchQuery}
               sort={state.ui.sort}
               error={locationError}
@@ -466,6 +659,13 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
               }}
               onSortChange={(value) => dispatch({ type: "sort", value })}
               onLocationFilter={selectLocationFilters}
+              onResetFilters={() => {
+                setLocationError(null);
+                dispatch({ type: "search", value: "" });
+                dispatch({ type: "platoonFilter", value: null });
+                dispatch({ type: "locationFilter", value: null });
+                dispatch({ type: "conscriptionFilter", value: null });
+              }}
             />
           )}
           {state.ui.activeSection === "groups" && canReadGroups ? (
@@ -499,10 +699,10 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
               onLocationFilter={selectLocationFilters}
               onCustomizeOverview={() => openAdmin("overview")}
               onLocation={applyLocation}
-              pendingPersonId={pendingLocationPersonId}
               canWrite={canWriteRoster}
               canCustomizeOverview={canManageReferences}
               dispatch={dispatch}
+              selection={selectionProps}
             />
           )}
         </main>
@@ -547,6 +747,17 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
         onClose={() => dispatch({ type: "closeSheet" })}
         onPick={applyLocation}
       />}
+      {canWriteRoster && (
+        <BatchLocationSheet
+          count={selectedIds.size}
+          locations={sortedLocations}
+          open={batchSheetOpen}
+          onClose={() => setBatchSheetOpen(false)}
+          onPick={(to) => {
+            void applyLocationBatch([...selectedIds], to);
+          }}
+        />
+      )}
       <HistoryPanel
         open={state.ui.isHistoryPanelOpen}
         logs={state.changeLog}
@@ -563,6 +774,22 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
           dispatch({ type: "snapshot", snapshot, preserveUi: true })
         }
        />}
+      {canWriteRoster && (
+        <SelectionBar
+          count={selectedIds.size}
+          totalVisible={visiblePersonIds.length}
+          locations={sortedLocations}
+          pending={pendingLocationIds.size > 0}
+          onSelectAll={() => {
+            setSelectedIds(new Set(visiblePersonIds));
+          }}
+          onClear={clearSelection}
+          onMove={(to) => {
+            void applyLocationBatch([...selectedIds], to);
+          }}
+          onOpenMore={() => setBatchSheetOpen(true)}
+        />
+      )}
       <Toast
         batch={toastBatch}
         locations={sortedLocations}
@@ -571,3 +798,5 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
     </div>
   );
 }
+
+

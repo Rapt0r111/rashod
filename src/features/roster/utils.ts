@@ -116,6 +116,15 @@ export function countInRota(people: Person[]) {
   return people.filter((person) => person.location === "rota").length;
 }
 
+/** Alias kept for call sites; present keys default to rota. */
+export function countPresent(
+  people: Person[],
+  presentKeys: readonly string[] = ["rota"],
+) {
+  const keys = new Set(presentKeys);
+  return people.filter((person) => keys.has(person.location)).length;
+}
+
 export function formatDateLabel(date = new Date()) {
   return new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", weekday: "long" }).format(date);
 }

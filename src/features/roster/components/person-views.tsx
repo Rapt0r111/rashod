@@ -18,6 +18,9 @@ export function toneClasses(token: string) {
   return toneMap[token] ?? toneMap.neutral;
 }
 
+const selectedOutline =
+  "border-cyan! ring-2 ring-cyan ring-offset-2 ring-offset-bg-base bg-[color-mix(in_oklch,var(--cyan)_12%,transparent)]!";
+
 export const RosterRow = memo(function RosterRow({
   person,
   locations,
@@ -25,6 +28,8 @@ export const RosterRow = memo(function RosterRow({
   pending,
   contextLabel,
   canWrite = true,
+  selected = false,
+  onToggleSelect,
   onLocation,
   onMore,
 }: {
@@ -34,44 +39,90 @@ export const RosterRow = memo(function RosterRow({
   pending?: boolean;
   contextLabel?: string;
   canWrite?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (personId: string) => void;
   onLocation: (person: Person, to: string) => void;
   onMore: (personId: string) => void;
 }) {
   const quick = locations.filter((location) => location.isQuick);
+  const canSelect = canWrite && !!onToggleSelect;
   return (
-    <article className={cx("grid min-h-17 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2.5 overflow-hidden rounded-[15px] border border-line bg-bg-panel p-2.5 shadow-[inset_0_1px_0_rgb(255_255_255/0.035)] max-[520px]:gap-2 max-[560px]:grid-cols-1", flash && "border-accent-line! bg-[color-mix(in_oklch,var(--accent)_13%,transparent)]!")} aria-busy={pending || undefined}>
-      <div className="flex min-w-0 items-center gap-2.5 max-[520px]:gap-2">
+    <article
+      className={cx(
+        "grid min-h-17 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2.5 overflow-hidden rounded-[15px] border border-line bg-bg-panel p-2.5 shadow-[inset_0_1px_0_rgb(255_255_255/0.035)] transition-[border-color,box-shadow,background-color] duration-200 max-[520px]:gap-2 max-[560px]:grid-cols-1",
+        flash && !selected && "border-accent-line! bg-[color-mix(in_oklch,var(--accent)_13%,transparent)]!",
+        selected && selectedOutline,
+      )}
+      aria-busy={pending || undefined}
+      aria-selected={canSelect ? selected : undefined}
+    >
+      <div
+        className={cx(
+          "flex min-w-0 items-center gap-2.5 rounded-[12px] max-[520px]:gap-2",
+          canSelect && "cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-cyan",
+        )}
+        role={canSelect ? "button" : undefined}
+        tabIndex={canSelect ? 0 : undefined}
+        onClick={canSelect ? () => onToggleSelect?.(person.id) : undefined}
+        onKeyDown={
+          canSelect
+            ? (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onToggleSelect?.(person.id);
+                }
+              }
+            : undefined
+        }
+        aria-label={
+          canSelect
+            ? selected
+              ? `Снять выбор: ${person.name}`
+              : `Выбрать: ${person.name}`
+            : undefined
+        }
+        aria-pressed={canSelect ? selected : undefined}
+      >
         <Avatar person={person} />
         <div className="grid min-w-0 flex-1 gap-0.75 overflow-hidden">
-        <strong className="max-w-full wrap-anywhere whitespace-normal">{abbreviateName(person.name)}</strong>
-        <span className="max-w-full wrap-anywhere whitespace-normal text-xs text-text-muted">{person.rank}</span>
-        {person.conscriptionNumber && <span className="max-w-full wrap-anywhere whitespace-normal text-xs text-text-muted">{conscriptionLabel(person.conscriptionNumber)}</span>}
-        {contextLabel && <span className="max-w-full wrap-anywhere whitespace-normal text-xs text-text-muted">{contextLabel}</span>}
+          <strong className="max-w-full wrap-anywhere whitespace-normal">{abbreviateName(person.name)}</strong>
+          <span className="max-w-full wrap-anywhere whitespace-normal text-xs text-text-muted">{person.rank}</span>
+          {person.conscriptionNumber && (
+            <span className="max-w-full wrap-anywhere whitespace-normal text-xs text-text-muted">
+              {conscriptionLabel(person.conscriptionNumber)}
+            </span>
+          )}
+          {contextLabel && (
+            <span className="max-w-full wrap-anywhere whitespace-normal text-xs text-text-muted">{contextLabel}</span>
+          )}
         </div>
         <LocationBadge value={person.location} locations={locations} />
       </div>
       {canWrite && (
-        <div className="flex min-w-0 shrink-0 justify-end gap-1.5 max-[560px]:w-full max-[560px]:justify-start max-[560px]:overflow-x-auto max-[560px]:overscroll-x-contain max-[560px]:touch-pan-x max-[560px]:pb-0.5">
-            {quick.map((location) => (
-              <button
-                key={location.id}
-                type="button"
-                className={cx(
-                  "grid h-11 w-11 min-h-11 min-w-11 shrink-0 place-items-center rounded-[11px] border border-line bg-white/[0.035] font-extrabold text-text-secondary transition duration-200 active:translate-y-px",
-                  person.location === location.key && toneClasses(location.colorToken).text,
-                  person.location === location.key && toneClasses(location.colorToken).border,
-                  person.location === location.key && "shadow-[inset_0_0_0_1px_currentColor]",
-                  pending && "cursor-wait opacity-60",
-                )}
-                aria-pressed={person.location === location.key}
-                disabled={pending || person.location === location.key}
-                onClick={() => onLocation(person, location.key)}
-                aria-label={`Перевести ${person.name} в ${location.label}`}
-                title={location.label}
-              >
-                {location.quickCode}
-              </button>
-            ))}
+        <div
+          className="flex min-w-0 shrink-0 justify-end gap-1.5 max-[560px]:w-full max-[560px]:justify-start max-[560px]:overflow-x-auto max-[560px]:overscroll-x-contain max-[560px]:touch-pan-x max-[560px]:pb-0.5"
+          onClick={(event) => event.stopPropagation()}
+        >
+          {quick.map((location) => (
+            <button
+              key={location.id}
+              type="button"
+              className={cx(
+                "grid h-11 w-11 min-h-11 min-w-11 shrink-0 place-items-center rounded-[11px] border border-line bg-white/[0.035] font-extrabold text-text-secondary transition duration-200 active:translate-y-px",
+                person.location === location.key && toneClasses(location.colorToken).text,
+                person.location === location.key && toneClasses(location.colorToken).border,
+                person.location === location.key && "shadow-[inset_0_0_0_1px_currentColor]",
+                pending && "cursor-wait opacity-60",
+              )}
+              aria-pressed={person.location === location.key}
+              disabled={pending || person.location === location.key}
+              onClick={() => onLocation(person, location.key)}
+              aria-label={`Перевести ${person.name} в ${location.label}`}
+              title={location.label}
+            >
+              {location.quickCode}
+            </button>
+          ))}
           <button
             className="grid h-11 w-11 min-h-11 min-w-11 shrink-0 place-items-center rounded-[11px] border border-line bg-white/[0.035] font-extrabold text-text-secondary transition duration-200 active:translate-y-px"
             type="button"
@@ -92,27 +143,54 @@ export const PersonCard = memo(function PersonCard({
   locations,
   flash,
   canWrite = true,
+  selected = false,
+  onToggleSelect,
   onClick,
 }: {
   person: Person;
   locations: LocationOption[];
   flash: boolean;
   canWrite?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (personId: string) => void;
   onClick: (personId: string) => void;
 }) {
   return (
     <button
       type="button"
-      className={cx("grid min-h-34.5 gap-4 rounded-2xl border border-line bg-bg-panel p-3.5 text-left text-text-primary transition duration-200 active:translate-y-px disabled:cursor-default", flash && "border-accent-line! bg-[color-mix(in_oklch,var(--accent)_13%,transparent)]!")}
-      onClick={() => canWrite && onClick(person.id)}
+      className={cx(
+        "grid min-h-34.5 gap-4 rounded-2xl border border-line bg-bg-panel p-3.5 text-left text-text-primary transition-[border-color,box-shadow,background-color,transform] duration-200 active:translate-y-px disabled:cursor-default",
+        flash && !selected && "border-accent-line! bg-[color-mix(in_oklch,var(--accent)_13%,transparent)]!",
+        selected && selectedOutline,
+      )}
+      onClick={() => {
+        if (!canWrite) return;
+        if (onToggleSelect) {
+          onToggleSelect(person.id);
+          return;
+        }
+        onClick(person.id);
+      }}
       disabled={!canWrite}
+      aria-pressed={onToggleSelect ? selected : undefined}
+      aria-label={
+        onToggleSelect
+          ? selected
+            ? `Снять выбор: ${person.name}`
+            : `Выбрать: ${person.name}`
+          : undefined
+      }
     >
       <span className="flex min-w-0 items-center gap-2.5">
         <Avatar person={person} />
         <span className="grid min-w-0 gap-0.75 overflow-hidden">
           <strong className="max-w-full wrap-anywhere whitespace-normal">{abbreviateName(person.name)}</strong>
           <em className="max-w-full wrap-anywhere whitespace-normal text-xs not-italic text-text-muted">{person.rank}</em>
-          {person.conscriptionNumber && <em className="max-w-full wrap-anywhere whitespace-normal text-xs not-italic text-text-muted">{conscriptionLabel(person.conscriptionNumber)}</em>}
+          {person.conscriptionNumber && (
+            <em className="max-w-full wrap-anywhere whitespace-normal text-xs not-italic text-text-muted">
+              {conscriptionLabel(person.conscriptionNumber)}
+            </em>
+          )}
         </span>
       </span>
       <LocationBadge value={person.location} locations={locations} wide />
