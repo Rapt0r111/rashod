@@ -213,3 +213,109 @@
     outline-offset: 3px;
   }
 }
+
+.schedule-table-shell {
+  --schedule-number-width: 42px;
+  --schedule-person-width: 238px;
+}
+
+.schedule-table .schedule-sticky {
+  position: sticky;
+  z-index: 2;
+}
+
+.schedule-table .schedule-number-cell {
+  left: 0;
+  width: var(--schedule-number-width);
+  min-width: var(--schedule-number-width);
+}
+
+.schedule-table .schedule-person-cell {
+  left: var(--schedule-number-width);
+  width: var(--schedule-person-width);
+  min-width: var(--schedule-person-width);
+}
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 10mm;
+  }
+
+  html,
+  body {
+    height: auto;
+    overflow: visible;
+    background: white !important;
+    color: #111 !important;
+  }
+
+  body::before {
+    display: none;
+  }
+
+  .schedule-screen {
+    display: block !important;
+    max-width: none !important;
+    padding: 0 !important;
+    color: #111 !important;
+  }
+
+  .schedule-toolbar {
+    padding: 0 0 8pt !important;
+    border: 0 !important;
+    background: white !important;
+    box-shadow: none !important;
+  }
+
+  .schedule-toolbar h1,
+  .schedule-toolbar p,
+  .schedule-toolbar span,
+  .schedule-toolbar b {
+    color: #111 !important;
+  }
+
+  .schedule-controls,
+  .schedule-legend,
+  .schedule-print-note {
+    display: none !important;
+  }
+
+  .schedule-table-shell {
+    overflow: visible !important;
+    border: 1px solid #222 !important;
+    border-radius: 0 !important;
+    background: white !important;
+    box-shadow: none !important;
+  }
+
+  .schedule-table-scroll {
+    overflow: visible !important;
+  }
+
+  .schedule-table {
+    width: 100%;
+    min-width: 0 !important;
+    color: #111 !important;
+    font-size: 8pt;
+  }
+
+  .schedule-table .schedule-sticky {
+    position: static !important;
+    background: white !important;
+  }
+
+  .schedule-table th,
+  .schedule-table td {
+    border-color: #777 !important;
+  }
+
+  .schedule-section-row th {
+    background: #eee !important;
+    color: #111 !important;
+  }
+
+  .schedule-table thead {
+    display: table-header-group;
+  }
+}

@@ -615,7 +615,7 @@ export function GroupsApp({
 
         {activeSnapshot && canWrite && (
           <SettingsPanel
-            key={`${activeSnapshot.group.id}:${activeSnapshot.group.updatedAt}:${activeSnapshot.rule.peoplePerDay}:${activeSnapshot.rule.autoRotate}:${activeSnapshot.rule.activeDays.join("-")}:${activeSnapshot.rule.enabledPlatoons.join("-")}:${activeSnapshot.rule.priorityMode}`}
+            key={`${activeSnapshot.group.id}:${activeSnapshot.group.updatedAt}:${activeSnapshot.rule.peoplePerDay}:${activeSnapshot.rule.assignmentQuotas.map((quota) => quota.platoonId + "-" + quota.count).join(",")}:${activeSnapshot.rule.autoRotate}:${activeSnapshot.rule.activeDays.join("-")}:${activeSnapshot.rule.enabledPlatoons.join("-")}:${activeSnapshot.rule.priorityMode}`}
             item={activeSnapshot}
             platoons={platoons}
             isBusy={isBusy}

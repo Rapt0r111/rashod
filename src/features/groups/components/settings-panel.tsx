@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { GearSixIcon, TrashIcon } from "@phosphor-icons/react";
+import { GearSixIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { SelectField } from "@/components/select-field";
 import type { Platoon } from "../../roster/types";
-import type { DutyGroupSnapshot, GroupPriorityMode } from "../types";
+import type { DutyGroupSnapshot, GroupAssignmentQuota, GroupPriorityMode } from "../types";
 import { DAY_NAMES, DAY_SHORT_NAMES } from "../utils";
 import { CollapsibleSection } from "./collapsible-section";
 import { GROUP_NAME_MAX_LENGTH, GROUP_NOTES_MAX_LENGTH } from "./constants";
@@ -25,6 +25,7 @@ export function SettingsPanel({
   onSave: (payload: {
     enabledPlatoons: string[];
     peoplePerDay: number;
+    assignmentQuotas: GroupAssignmentQuota[];
     autoRotate: boolean;
     activeDays: number[];
     priorityMode: GroupPriorityMode;
@@ -36,26 +37,26 @@ export function SettingsPanel({
   const [notes, setNotes] = useState(item.group.notes);
   const [nameTouched, setNameTouched] = useState(false);
   const [peoplePerDay, setPeoplePerDay] = useState(item.rule.peoplePerDay);
+  const [assignmentQuotas, setAssignmentQuotas] = useState<GroupAssignmentQuota[]>(item.rule.assignmentQuotas);
+  const [enabledPlatoons, setEnabledPlatoons] = useState(item.rule.enabledPlatoons);
   const [autoRotate, setAutoRotate] = useState(item.rule.autoRotate);
   const [activeDays, setActiveDays] = useState(item.rule.activeDays);
-  const [enabledPlatoons, setEnabledPlatoons] = useState(
-    item.rule.enabledPlatoons,
-  );
   const [priorityMode, setPriorityMode] = useState<GroupPriorityMode>(
     item.rule.priorityMode,
   );
+
+  const togglePlatoon = (id: string) =>
+    setEnabledPlatoons((current) =>
+      current.includes(id)
+        ? current.filter((value) => value !== id)
+        : [...current, id],
+    );
 
   const toggleDay = (day: number) =>
     setActiveDays((current) =>
       current.includes(day)
         ? current.filter((value) => value !== day)
         : [...current, day].sort(),
-    );
-  const togglePlatoon = (id: string) =>
-    setEnabledPlatoons((current) =>
-      current.includes(id)
-        ? current.filter((value) => value !== id)
-        : [...current, id],
     );
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
@@ -135,13 +136,13 @@ export function SettingsPanel({
               type="button"
               className="cursor-pointer border-0 bg-transparent text-text-primary disabled:cursor-not-allowed disabled:opacity-55"
               onClick={() => setPeoplePerDay((value) => Math.max(1, value - 1))}
-              disabled={isBusy || peoplePerDay <= 1}
+              disabled={isBusy || assignmentQuotas.length > 0 || peoplePerDay <= 1}
               aria-label="Уменьшить количество людей в день"
             >
               -
             </button>
             <strong className="grid place-items-center border-x border-line font-mono">
-              {peoplePerDay}
+              {assignmentQuotas.length > 0 ? assignmentQuotas.reduce((total, quota) => total + quota.count, 0) : peoplePerDay}
             </strong>
             <button
               type="button"
@@ -149,7 +150,7 @@ export function SettingsPanel({
               onClick={() =>
                 setPeoplePerDay((value) => Math.min(40, value + 1))
               }
-              disabled={isBusy || peoplePerDay >= 40}
+              disabled={isBusy || assignmentQuotas.length > 0 || peoplePerDay >= 40}
               aria-label="Увеличить количество людей в день"
             >
               +
@@ -195,24 +196,112 @@ export function SettingsPanel({
           </div>
         </div>
         <div className="grid min-w-0 gap-1.75">
-          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-extrabold text-text-secondary">
-            Кого брать в ротацию
-          </span>
-          <div className="flex flex-wrap gap-1.75">
-            {platoons.map((platoon) => (
-              <StyledCheckbox
-                key={platoon.id}
-                checked={enabledPlatoons.includes(platoon.id)}
-                label={platoon.label}
-                compact
-                onChange={() => togglePlatoon(platoon.id)}
-              />
-            ))}
+          <div className="flex items-center justify-between gap-2">
+            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-extrabold text-text-secondary">
+              Точные квоты по подразделениям
+            </span>
+            <span className="shrink-0 rounded-full border border-accent-line bg-accent-soft px-2 py-1 text-[11px] font-bold text-text-primary">
+              {assignmentQuotas.reduce((total, quota) => total + quota.count, 0)} чел.
+            </span>
           </div>
-          {enabledPlatoons.length === 0 && (
+          <small className="text-[11px] text-text-muted">
+            Каждая строка задаёт точное количество людей из выбранного подразделения.
+          </small>
+          {assignmentQuotas.length > 0 && (
+            <div className="grid gap-2">
+              {assignmentQuotas.map((quota) => (
+                <div key={quota.platoonId} className="grid grid-cols-[minmax(0,1fr)_84px_36px] items-center gap-1.5">
+                  <SelectField
+                    ariaLabel="Подразделение квоты"
+                    value={quota.platoonId}
+                    options={platoons.filter((platoon) =>
+                      !assignmentQuotas.some((item) => item.platoonId !== quota.platoonId && item.platoonId === platoon.id),
+                    ).map((platoon) => ({ value: platoon.id, label: platoon.label }))}
+                    onChange={(value) => setAssignmentQuotas((current) => current.map((item) =>
+                      item.platoonId === quota.platoonId ? { ...item, platoonId: value } : item,
+                    ))}
+                  />
+                  <div className="grid grid-cols-[24px_1fr_24px] overflow-hidden rounded-xl border border-line">
+                    <button
+                      type="button"
+                      className="cursor-pointer border-0 bg-transparent text-text-primary disabled:cursor-not-allowed disabled:opacity-55"
+                      onClick={() => setAssignmentQuotas((current) => current.map((item) =>
+                        item.platoonId === quota.platoonId ? { ...item, count: Math.max(1, item.count - 1) } : item,
+                      ))}
+                      disabled={isBusy || quota.count <= 1}
+                      aria-label="Уменьшить квоту"
+                    >
+                      −
+                    </button>
+                    <strong className="grid place-items-center border-x border-line font-mono">{quota.count}</strong>
+                    <button
+                      type="button"
+                      className="cursor-pointer border-0 bg-transparent text-text-primary disabled:cursor-not-allowed disabled:opacity-55"
+                      onClick={() => setAssignmentQuotas((current) => current.map((item) =>
+                        item.platoonId === quota.platoonId ? { ...item, count: Math.min(40, item.count + 1) } : item,
+                      ))}
+                      disabled={isBusy || quota.count >= 40}
+                      aria-label="Увеличить квоту"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    className="grid size-9.5 place-items-center rounded-xl border border-line bg-transparent text-text-muted transition-colors hover:border-red hover:text-red"
+                    onClick={() => setAssignmentQuotas((current) => {
+                      const next = current.filter((item) => item.platoonId !== quota.platoonId);
+                      // Back to free count mode: keep peoplePerDay in stepper bounds (1–40).
+                      if (next.length === 0) {
+                        setPeoplePerDay((value) => Math.min(40, Math.max(1, value)));
+                      }
+                      return next;
+                    })}
+                    disabled={isBusy}
+                    aria-label="Удалить квоту"
+                  >
+                    <TrashIcon size={15} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            className="inline-flex min-h-9.5 items-center justify-center gap-1.5 rounded-xl border border-line bg-transparent px-3 text-xs font-extrabold text-text-secondary transition-colors hover:border-accent-line hover:text-text-primary"
+            disabled={isBusy || assignmentQuotas.length >= platoons.length}
+            onClick={() => {
+              const nextPlatoon = platoons.find((platoon) => !assignmentQuotas.some((quota) => quota.platoonId === platoon.id));
+              if (nextPlatoon) setAssignmentQuotas((current) => [...current, { platoonId: nextPlatoon.id, count: 1 }]);
+            }}
+          >
+            <PlusIcon size={15} /> Добавить подразделение
+          </button>
+          {assignmentQuotas.length === 0 && (
             <small className="text-[11px] text-text-muted">
-              Если ничего не выбрано — берём из всех подразделений.
+              Если квоты не заданы, действует общее количество и фильтр подразделений ниже.
             </small>
+          )}
+          {assignmentQuotas.length === 0 && (
+            <div className="grid min-w-0 gap-1.75">
+              <span className="text-[11px] font-bold text-text-secondary">
+                Ограничить ротацию подразделениями
+              </span>
+              <div className="flex flex-wrap gap-1.75">
+                {platoons.map((platoon) => (
+                  <StyledCheckbox
+                    key={platoon.id}
+                    checked={enabledPlatoons.includes(platoon.id)}
+                    label={platoon.label}
+                    compact
+                    onChange={() => togglePlatoon(platoon.id)}
+                  />
+                ))}
+              </div>
+              {enabledPlatoons.length === 0 && (
+                <small className="text-[11px] text-text-muted">Берём людей из всех подразделений.</small>
+              )}
+            </div>
           )}
         </div>
         <button
@@ -221,8 +310,9 @@ export function SettingsPanel({
           disabled={isBusy}
           onClick={() =>
             onSave({
-              enabledPlatoons,
-              peoplePerDay,
+              enabledPlatoons: assignmentQuotas.length > 0 ? assignmentQuotas.map((quota) => quota.platoonId) : enabledPlatoons,
+              peoplePerDay: assignmentQuotas.length > 0 ? assignmentQuotas.reduce((total, quota) => total + quota.count, 0) : peoplePerDay,
+              assignmentQuotas,
               autoRotate,
               activeDays,
               priorityMode,

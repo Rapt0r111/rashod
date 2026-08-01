@@ -33,6 +33,13 @@ describe("postgres groups repository normalization", () => {
     expect(repositorySource).not.toContain("${JSON.stringify(rule.enabledPlatoons)}::jsonb");
     expect(repositorySource).not.toContain("${JSON.stringify(rule.activeDays)}::jsonb");
   });
+
+  it("uses shared platoon filter and keeps conflict fallback for quota auto-fill", () => {
+    expect(repositorySource).toContain("rulePlatoonFilter(rule)");
+    expect(repositorySource).toContain("selectQuotaRotationPool(candidates, quota.platoonId, assignedIds)");
+    // Must not pre-filter blocked people out of the quota pool (breaks conflict fallback).
+    expect(repositorySource).not.toContain("!blocked.has(person.id)");
+  });
 });
 
 describe("manual group assignment eligibility", () => {

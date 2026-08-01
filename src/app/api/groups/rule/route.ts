@@ -11,7 +11,10 @@ const schema = z.object({
   groupId: idString,
   expectedUpdatedAt: z.number().int().nonnegative().optional(),
   enabledPlatoons: uniqueArray(idString, 64).optional(),
-  peoplePerDay: z.number().int().min(1).max(40).optional(),
+  peoplePerDay: z.number().int().min(1).max(2560).optional(),
+  assignmentQuotas: z.array(z.object({ platoonId: idString, count: z.number().int().min(1).max(40) })).max(64).refine(
+    (items) => new Set(items.map((item) => item.platoonId)).size === items.length,
+  ).optional(),
   autoRotate: z.boolean().optional(),
   activeDays: uniqueArray(z.number().int().min(0).max(6), 7).optional(),
   priorityMode: z.enum(["oldest", "random"]).optional(),

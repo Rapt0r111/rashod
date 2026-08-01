@@ -126,6 +126,7 @@ export const SERVICE_SECTIONS = [
   { key: "overview", label: "Обзор" },
   { key: "all", label: "Все взвода" },
   { key: "groups", label: "Группы" },
+  { key: "schedule", label: "График" },
   { key: "tasks", label: "Задачи" },
 ] as const;
 

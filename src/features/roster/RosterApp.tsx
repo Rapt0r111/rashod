@@ -45,6 +45,7 @@ import { OperatorBar } from "./components/operator-bar";
 import { SelectionBar } from "./components/selection-bar";
 import type { SelectionProps } from "./components/selection-types";
 import type { TasksSnapshot } from "../tasks/types";
+import type { ScheduleSnapshot } from "../schedule/types";
 import { hasPermission, type Permission } from "@/features/auth/permissions";
 import { Loader } from "@/components/loader";
 
@@ -54,6 +55,10 @@ const GroupsApp = dynamic(
 );
 const TasksApp = dynamic(
   () => import("../tasks/TasksApp").then((module) => module.TasksApp),
+  { loading: () => <SectionLoading /> },
+);
+const ScheduleApp = dynamic(
+  () => import("../schedule/ScheduleApp").then((module) => module.ScheduleApp),
   { loading: () => <SectionLoading /> },
 );
 const AdminPanel = dynamic(
@@ -111,10 +116,12 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
     null,
   );
   const [tasksSnapshot, setTasksSnapshot] = useState<TasksSnapshot | null>(null);
-  const [sectionLoadErrors, setSectionLoadErrors] = useState<Partial<Record<"groups" | "tasks", string>>>({});
+  const [scheduleSnapshot, setScheduleSnapshot] = useState<ScheduleSnapshot | null>(null);
+  const [sectionLoadErrors, setSectionLoadErrors] = useState<Partial<Record<"groups" | "schedule" | "tasks", string>>>({});
   const [actionError, setActionError] = useState<string | null>(null);
   const groupsRequestRef = useRef<Promise<void> | null>(null);
   const tasksRequestRef = useRef<Promise<void> | null>(null);
+  const scheduleRequestRef = useRef<Promise<void> | null>(null);
   const [pendingLocationIds, setPendingLocationIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -212,10 +219,28 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
       });
   }, [canReadTasks, tasksSnapshot]);
 
+  const loadScheduleSnapshot = useCallback(() => {
+    if (scheduleSnapshot || scheduleRequestRef.current) return;
+    setSectionLoadErrors((current) => ({ ...current, schedule: undefined }));
+    scheduleRequestRef.current = import("../schedule/api")
+      .then(({ fetchScheduleSnapshot }) => fetchScheduleSnapshot())
+      .then(setScheduleSnapshot)
+      .catch(() => {
+        setSectionLoadErrors((current) => ({
+          ...current,
+          schedule: "Не удалось загрузить график нарядов.",
+        }));
+      })
+      .finally(() => {
+        scheduleRequestRef.current = null;
+      });
+  }, [scheduleSnapshot]);
+
   useEffect(() => {
     if (state.ui.activeSection === "groups") loadGroupsSnapshot();
+    if (state.ui.activeSection === "schedule") loadScheduleSnapshot();
     if (state.ui.activeSection === "tasks") loadTasksSnapshot();
-  }, [loadGroupsSnapshot, loadTasksSnapshot, state.ui.activeSection]);
+  }, [loadGroupsSnapshot, loadScheduleSnapshot, loadTasksSnapshot, state.ui.activeSection]);
 
   useEffect(() => {
     const historySection =
@@ -591,7 +616,7 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
     groups: groupsSnapshot?.groups.length,
     tasks: tasksSnapshot?.active.length,
   };
-  const isRosterSection = state.ui.activeSection !== "groups" && state.ui.activeSection !== "tasks";
+  const isRosterSection = state.ui.activeSection !== "groups" && state.ui.activeSection !== "schedule" && state.ui.activeSection !== "tasks";
   const selectionProps: SelectionProps = useMemo(
     () => ({
       selectedIds,
@@ -686,6 +711,14 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
               <GroupsApp initialSnapshot={groupsSnapshot} canWrite={canWriteGroups} />
             ) : sectionLoadErrors.groups ? (
               <SectionLoadFailure message={sectionLoadErrors.groups} onRetry={loadGroupsSnapshot} />
+            ) : (
+              <SectionLoading />
+            )
+          ) : state.ui.activeSection === "schedule" ? (
+            scheduleSnapshot ? (
+              <ScheduleApp initialSnapshot={scheduleSnapshot} onOpenGroups={() => selectSection("groups")} onSnapshotChange={setScheduleSnapshot} />
+            ) : sectionLoadErrors.schedule ? (
+              <SectionLoadFailure message={sectionLoadErrors.schedule} onRetry={loadScheduleSnapshot} />
             ) : (
               <SectionLoading />
             )

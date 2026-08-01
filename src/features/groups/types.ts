@@ -26,12 +26,14 @@ export type DutyGroup = {
 };
 
 export type GroupPriorityMode = "oldest" | "random";
+export type GroupAssignmentQuota = { platoonId: string; count: number };
 
 export type GroupRule = {
   id: string;
   groupId: string;
   enabledPlatoons: string[];
   peoplePerDay: number;
+  assignmentQuotas: GroupAssignmentQuota[];
   autoRotate: boolean;
   activeDays: number[];
   priorityMode: GroupPriorityMode;
@@ -128,6 +130,7 @@ export type RuleUpdateInput = {
   expectedUpdatedAt?: number;
   enabledPlatoons?: string[];
   peoplePerDay?: number;
+  assignmentQuotas?: GroupAssignmentQuota[];
   autoRotate?: boolean;
   activeDays?: number[];
   priorityMode?: GroupPriorityMode;

@@ -5,10 +5,17 @@ import {
   dayOfWeekFromKey,
   filterCandidates,
   findExcessAutomaticAssignmentIds,
+  filterPeopleByAssignmentQuotas,
   findStaleAutomaticAssignmentIds,
   pickByOldestAssignment,
   pickRandomAssignment,
+  normalizeAssignmentQuotas,
+  quotaAssignmentCounts,
+  quotaTotal,
   pickRotationCandidates,
+  resolveRuleEnabledPlatoons,
+  rulePlatoonFilter,
+  selectQuotaRotationPool,
   weekDates,
 } from "@/features/groups/logic";
 
@@ -89,6 +96,86 @@ describe("group candidate filters", () => {
   });
 });
 
+describe("group assignment quotas", () => {
+  it("keeps exact counts per dynamically selected platoon", () => {
+    const quotaPeople = [
+      ...people,
+      makePerson("p4", "plt-2", 4, "Орлов О.О."),
+      makePerson("p5", "plt-3", 5, "Кузнецов К.К."),
+    ];
+    const quotas = normalizeAssignmentQuotas([
+      { platoonId: "plt-1", count: 1 },
+      { platoonId: "plt-2", count: 2 },
+      { platoonId: "plt-3", count: 1 },
+      { platoonId: "plt-1", count: 9 },
+    ]);
+    const candidates = filterPeopleByAssignmentQuotas(quotaPeople, quotas);
+    const peopleById = new Map(quotaPeople.map((person) => [person.id, person]));
+
+    expect(quotas).toEqual([
+      { platoonId: "plt-1", count: 1 },
+      { platoonId: "plt-2", count: 2 },
+      { platoonId: "plt-3", count: 1 },
+    ]);
+    expect(quotaTotal(quotas)).toBe(4);
+    expect(candidates.map((person) => person.platoonId)).toEqual(["plt-1", "plt-1", "plt-2", "plt-2", "plt-3"]);
+    expect(quotaAssignmentCounts(
+      quotas,
+      [assignment("p1", "2026-07-06"), assignment("p3", "2026-07-06"), assignment("p4", "2026-07-06"), assignment("p5", "2026-07-06")],
+      peopleById,
+    )).toEqual([1, 2, 1]);
+  });
+
+  it("keeps enabledPlatoons when saving empty quotas (platoon filter mode)", () => {
+    expect(
+      resolveRuleEnabledPlatoons([], ["plt-1", "plt-2"], ["plt-old"]),
+    ).toEqual(["plt-1", "plt-2"]);
+    expect(resolveRuleEnabledPlatoons([], [], ["plt-old"])).toEqual([]);
+    expect(resolveRuleEnabledPlatoons([], undefined, ["plt-old"])).toEqual(["plt-old"]);
+  });
+
+  it("derives enabledPlatoons from non-empty assignment quotas", () => {
+    expect(
+      resolveRuleEnabledPlatoons(
+        [{ platoonId: "plt-1", count: 2 }, { platoonId: "plt-3", count: 1 }],
+        ["plt-ignored"],
+        ["plt-old"],
+      ),
+    ).toEqual(["plt-1", "plt-3"]);
+  });
+
+  it("exposes the same platoon filter for eligibility in quota and free modes", () => {
+    expect(
+      rulePlatoonFilter({
+        enabledPlatoons: ["plt-old"],
+        assignmentQuotas: [{ platoonId: "plt-1", count: 1 }, { platoonId: "plt-2", count: 2 }],
+      }),
+    ).toEqual(["plt-1", "plt-2"]);
+    expect(
+      rulePlatoonFilter({ enabledPlatoons: ["plt-1"], assignmentQuotas: [] }),
+    ).toEqual(["plt-1"]);
+    expect(rulePlatoonFilter({ enabledPlatoons: [], assignmentQuotas: [] })).toEqual([]);
+  });
+
+  it("keeps same-date conflicts in the quota rotation pool for fallback", () => {
+    const pool = selectQuotaRotationPool(
+      people,
+      "plt-1",
+      new Set(["p2"]),
+    );
+    expect(pool.map((person) => person.id)).toEqual(["p1"]);
+
+    const blocked = new Set(["p1"]);
+    const short = pickRotationCandidates(
+      selectQuotaRotationPool(people, "plt-1", new Set()),
+      [],
+      2,
+      blocked,
+    );
+    // p1 blocked first pass; fallback still fills from same platoon when free seats run out.
+    expect(short.map((person) => person.id)).toEqual(["p2", "p1"]);
+  });
+});
 describe("group rotation priority", () => {
   it("picks people with oldest or missing assignments first", () => {
     const picked = pickByOldestAssignment(

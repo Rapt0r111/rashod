@@ -21,9 +21,16 @@ import {
   filterCandidates,
   findExcessAutomaticAssignmentIds,
   findStaleAutomaticAssignmentIds,
+  filterPeopleByAssignmentQuotas,
   localDateKey,
+  normalizeAssignmentQuotas,
+  quotaAssignmentCounts,
+  quotaTotal,
   normalizePriorityMode,
   pickRotationCandidates,
+  resolveRuleEnabledPlatoons,
+  rulePlatoonFilter,
+  selectQuotaRotationPool,
   weekDates,
 } from "@/features/groups/logic";
 import { inPostgresTransaction, pg } from "./postgres";
@@ -31,8 +38,9 @@ import { inPostgresTransaction, pg } from "./postgres";
 type DbPerson = Omit<Person, "createdAt" | "updatedAt"> & { created_at: Date; updated_at: Date };
 type DbTemplate = Omit<GroupTemplate, "createdAt" | "defaultActiveDays"> & { defaultActiveDays: unknown; created_at: Date };
 type DbGroup = Omit<DutyGroup, "createdAt" | "updatedAt"> & { created_at: Date; updated_at: Date };
-type DbRule = Omit<GroupRule, "enabledPlatoons" | "activeDays" | "priorityMode"> & {
+type DbRule = Omit<GroupRule, "enabledPlatoons" | "activeDays" | "priorityMode" | "assignmentQuotas"> & {
   enabledPlatoons: unknown;
+  assignmentQuotas: unknown;
   activeDays: unknown;
   priorityMode: unknown;
 };
@@ -46,6 +54,7 @@ type SnapshotRuleRow = {
   groupId: string;
   ruleId: string | null;
   enabledPlatoons: unknown;
+  assignmentQuotas: unknown;
   peoplePerDay: number | null;
   autoRotate: boolean | null;
   activeDays: unknown;
@@ -139,6 +148,7 @@ function toRule(row: DbRule): GroupRule {
     groupId: row.groupId,
     enabledPlatoons: normalizeStringArray(row.enabledPlatoons),
     peoplePerDay: row.peoplePerDay,
+    assignmentQuotas: normalizeAssignmentQuotas(row.assignmentQuotas),
     autoRotate: row.autoRotate,
     activeDays: normalizeActiveDays(row.activeDays),
     priorityMode: normalizePriorityMode(row.priorityMode),
@@ -182,7 +192,7 @@ async function getPlatoons(): Promise<Platoon[]> {
 async function getDutyRule(groupId: string, sql: SqlExecutor = pg()): Promise<GroupRule> {
   const rows = await sql<DbRule[]>`
     SELECT id, group_id AS "groupId", enabled_platoons AS "enabledPlatoons", people_per_day AS "peoplePerDay",
-      auto_rotate AS "autoRotate", active_days AS "activeDays", priority_mode AS "priorityMode"
+      assignment_quotas AS "assignmentQuotas", auto_rotate AS "autoRotate", active_days AS "activeDays", priority_mode AS "priorityMode"
     FROM group_rules WHERE group_id = ${groupId}
   `;
   if (rows[0]) return toRule(rows[0]);
@@ -198,6 +208,7 @@ async function getDutyRule(groupId: string, sql: SqlExecutor = pg()): Promise<Gr
     groupId,
     enabledPlatoons: [],
     peoplePerDay: defaults[0].defaultPeoplePerDay,
+    assignmentQuotas: [],
     autoRotate: true,
     activeDays: normalizeActiveDays(defaults[0].defaultActiveDays),
     priorityMode: "oldest",
@@ -303,12 +314,18 @@ async function ensureGroupAssignments(group: DutyGroup, rule: GroupRule, date: s
   await lockAssignmentDay(sql, date, group.id);
   const exclusions = await getDutyExclusions(group.id, sql);
   const people = await allPeopleSorted(sql);
-  const candidates = filterCandidates(people, rule, exclusions, date);
+  // Quotas own the platoon filter via filterPeopleByAssignmentQuotas; empty enabledPlatoons = no extra filter.
+  const candidateRule = rule.assignmentQuotas.length > 0 ? { ...rule, enabledPlatoons: [] } : rule;
+  const candidates = filterPeopleByAssignmentQuotas(
+    filterCandidates(people, candidateRule, exclusions, date),
+    rule.assignmentQuotas,
+  );
   const eligiblePersonIds = new Set(candidates.map((person) => person.id));
   let current = await getAssignmentsForGroupDate(group.id, date, sql);
+  const quotaMode = rule.assignmentQuotas.length > 0;
   const staleAutoIds = [
     ...findStaleAutomaticAssignmentIds(current, eligiblePersonIds),
-    ...findExcessAutomaticAssignmentIds(current, rule.peoplePerDay),
+    ...(quotaMode ? [] : findExcessAutomaticAssignmentIds(current, rule.peoplePerDay)),
     ...current
       .filter((assignment) => assignment.source === "auto" && assignment.conflicts.length > 0)
       .map((assignment) => assignment.id),
@@ -318,15 +335,46 @@ async function ensureGroupAssignments(group: DutyGroup, rule: GroupRule, date: s
     await deleteDutyAssignments(idsToDelete, sql);
     current = current.filter((assignment) => !idsToDelete.includes(assignment.id));
   }
-  const remaining = Math.max(0, rule.peoplePerDay - current.length);
-  if (!remaining) return;
   const history = await getAssignmentsForGroup(group.id, sql);
   const blocked = await assignedPersonIdsOnDate(date, group.id, sql);
+  if (quotaMode) {
+    const peopleById = new Map(people.map((person) => [person.id, person]));
+    const assignedIds = new Set(current.map((assignment) => assignment.personId));
+    const claimedIds = new Set<string>();
+    for (const quota of rule.assignmentQuotas) {
+      const matching = current.filter((assignment) =>
+        !claimedIds.has(assignment.personId) && peopleById.get(assignment.personId)?.platoonId === quota.platoonId,
+      );
+      const manual = matching.filter((assignment) => assignment.source === "manual");
+      const automatic = matching.filter((assignment) => assignment.source === "auto");
+      const keepAutomatic = Math.max(0, quota.count - manual.length);
+      const excessIds = automatic.slice(keepAutomatic).map((assignment) => assignment.id);
+      if (excessIds.length) {
+        await deleteDutyAssignments(excessIds, sql);
+        current = current.filter((assignment) => !excessIds.includes(assignment.id));
+        for (const assignment of automatic.slice(keepAutomatic)) assignedIds.delete(assignment.personId);
+      }
+      const retained = matching.filter((assignment) => !excessIds.includes(assignment.id));
+      for (const assignment of retained) claimedIds.add(assignment.personId);
+      const needed = Math.max(0, quota.count - retained.length);
+      if (!needed) continue;
+      // Do not pre-drop blocked people: conflict fallback only after free candidates exhausted.
+      const available = selectQuotaRotationPool(candidates, quota.platoonId, assignedIds);
+      const picked = pickRotationCandidates(available, history, needed, blocked, rule.priorityMode);
+      for (const person of picked) {
+        await writeDutyAssignment(group.id, person.id, date, "auto", "clear", sql);
+        assignedIds.add(person.id);
+        claimedIds.add(person.id);
+      }
+    }
+    return;
+  }
+  const remaining = Math.max(0, rule.peoplePerDay - current.length);
+  if (!remaining) return;
   const availableCandidates = candidates.filter((person) => !current.some((assignment) => assignment.personId === person.id));
   const picked = pickRotationCandidates(availableCandidates, history, remaining, blocked, rule.priorityMode);
   for (const person of picked) await writeDutyAssignment(group.id, person.id, date, "auto", "clear", sql);
 }
-
 function buildDutyGroupSnapshotFromData(
   group: DutyGroup,
   templates: GroupTemplate[],
@@ -344,8 +392,15 @@ function buildDutyGroupSnapshotFromData(
   const exclusions = exclusionsByGroup.get(group.id) ?? [];
   const assignments = assignmentsByGroup.get(group.id) ?? [];
   const today = dates[0] ?? localDateKey();
-  const candidatePeople = people.filter((person) => rule.enabledPlatoons.length === 0 || rule.enabledPlatoons.includes(person.platoonId));
-  const candidatesByDate = new Map(dates.map((date) => [date, filterCandidates(people, rule, exclusions, date)]));
+  const candidateRule = rule.assignmentQuotas.length > 0 ? { ...rule, enabledPlatoons: [] } : rule;
+  const candidatePeople = filterPeopleByAssignmentQuotas(
+    people.filter((person) => candidateRule.enabledPlatoons.length === 0 || candidateRule.enabledPlatoons.includes(person.platoonId)),
+    rule.assignmentQuotas,
+  );
+  const candidatesByDate = new Map(dates.map((date) => [
+    date,
+    filterPeopleByAssignmentQuotas(filterCandidates(people, candidateRule, exclusions, date), rule.assignmentQuotas),
+  ]));
   const assignmentsByDate = new Map<string, GroupAssignment[]>();
   for (const assignment of assignments) {
     const dayAssignments = assignmentsByDate.get(assignment.assignedDate) ?? [];
@@ -357,7 +412,9 @@ function buildDutyGroupSnapshotFromData(
     return [date, (candidatesByDate.get(date) ?? []).filter((person) => !assignedIds.has(person.id))];
   }));
   const availableToday = availablePeopleByDate[today] ?? [];
-  const candidatePlatoons = rule.enabledPlatoons.length === 0 ? platoonRows : platoonRows.filter((platoon) => rule.enabledPlatoons.includes(platoon.id));
+  const candidatePlatoons = rule.assignmentQuotas.length > 0
+    ? platoonRows.filter((platoon) => rule.assignmentQuotas.some((quota) => quota.platoonId === platoon.id))
+    : (rule.enabledPlatoons.length === 0 ? platoonRows : platoonRows.filter((platoon) => rule.enabledPlatoons.includes(platoon.id)));
   const week: GroupDaySnapshot[] = dates.map((date) => {
     const dayAssignments = assignmentsByDate.get(date) ?? [];
     const candidates = candidatesByDate.get(date) ?? [];
@@ -401,7 +458,7 @@ export async function getPostgresGroupsSnapshot(): Promise<GroupsSnapshot> {
     allPeopleSorted(),
     sql<SnapshotRuleRow[]>`
       SELECT dg.id AS "groupId", gr.id AS "ruleId",
-        gr.enabled_platoons AS "enabledPlatoons", gr.people_per_day AS "peoplePerDay",
+        gr.enabled_platoons AS "enabledPlatoons", gr.people_per_day AS "peoplePerDay", gr.assignment_quotas AS "assignmentQuotas",
         gr.auto_rotate AS "autoRotate", gr.active_days AS "activeDays", gr.priority_mode AS "priorityMode",
         gt.default_people_per_day AS "defaultPeoplePerDay", gt.default_active_days AS "defaultActiveDays"
       FROM duty_groups dg
@@ -468,6 +525,7 @@ export async function getPostgresGroupsSnapshot(): Promise<GroupsSnapshot> {
           groupId: row.groupId,
           enabledPlatoons: row.enabledPlatoons,
           peoplePerDay: row.peoplePerDay ?? row.defaultPeoplePerDay,
+          assignmentQuotas: row.assignmentQuotas,
           autoRotate: row.autoRotate ?? true,
           activeDays: row.activeDays,
           priorityMode: row.priorityMode,
@@ -477,6 +535,7 @@ export async function getPostgresGroupsSnapshot(): Promise<GroupsSnapshot> {
           groupId: row.groupId,
           enabledPlatoons: [],
           peoplePerDay: row.defaultPeoplePerDay,
+          assignmentQuotas: [],
           autoRotate: true,
           activeDays: normalizeActiveDays(row.defaultActiveDays),
           priorityMode: "oldest",
@@ -528,7 +587,7 @@ export async function createPostgresDutyGroup(input: GroupCreateInput): Promise<
   const now = Date.now();
   await inPostgresTransaction(async (transaction) => {
     await transaction`INSERT INTO duty_groups (id, template_id, name, notes, enabled, sort_order) VALUES (${groupId}, ${input.templateId}, ${input.name.trim()}, ${input.notes?.trim() ?? ""}, true, ${now})`;
-    await transaction`INSERT INTO group_rules (id, group_id, enabled_platoons, people_per_day, auto_rotate, active_days, priority_mode) VALUES (${randomUUID()}, ${groupId}, ${transaction.json([])}::jsonb, ${template.defaultPeoplePerDay}, true, ${transaction.json(normalizeActiveDays(template.defaultActiveDays))}::jsonb, 'oldest')`;
+    await transaction`INSERT INTO group_rules (id, group_id, enabled_platoons, people_per_day, assignment_quotas, auto_rotate, active_days, priority_mode) VALUES (${randomUUID()}, ${groupId}, ${transaction.json([])}::jsonb, ${template.defaultPeoplePerDay}, ${transaction.json([])}::jsonb, true, ${transaction.json(normalizeActiveDays(template.defaultActiveDays))}::jsonb, 'oldest')`;
   });
   return refreshPostgresAutomaticDutyAssignments();
 }
@@ -580,14 +639,21 @@ export async function updatePostgresDutyGroupRule(input: RuleUpdateInput): Promi
   const existing = await sql`SELECT 1 FROM group_rules WHERE group_id = ${input.groupId}`;
   if (!existing.length) {
     await sql`
-      INSERT INTO group_rules (id, group_id, enabled_platoons, people_per_day, auto_rotate, active_days, priority_mode)
-      VALUES (${current.id}, ${current.groupId}, ${sql.json(current.enabledPlatoons)}::jsonb, ${current.peoplePerDay}, ${current.autoRotate}, ${sql.json(current.activeDays)}::jsonb, ${current.priorityMode})
+      INSERT INTO group_rules (id, group_id, enabled_platoons, people_per_day, assignment_quotas, auto_rotate, active_days, priority_mode)
+      VALUES (${current.id}, ${current.groupId}, ${sql.json(current.enabledPlatoons)}::jsonb, ${current.peoplePerDay}, ${sql.json(current.assignmentQuotas)}::jsonb, ${current.autoRotate}, ${sql.json(current.activeDays)}::jsonb, ${current.priorityMode})
       ON CONFLICT (group_id) DO NOTHING
     `;
   }
+  const assignmentQuotas = normalizeAssignmentQuotas(input.assignmentQuotas ?? current.assignmentQuotas);
   const rule = {
-    enabledPlatoons: normalizeStringArray(input.enabledPlatoons ?? current.enabledPlatoons),
-    peoplePerDay: input.peoplePerDay ?? current.peoplePerDay,
+    assignmentQuotas,
+    // Empty assignmentQuotas must not wipe enabledPlatoons — only non-empty quotas derive the filter.
+    enabledPlatoons: resolveRuleEnabledPlatoons(
+      assignmentQuotas,
+      input.enabledPlatoons,
+      current.enabledPlatoons,
+    ),
+    peoplePerDay: assignmentQuotas.length > 0 ? quotaTotal(assignmentQuotas) : input.peoplePerDay ?? current.peoplePerDay,
     autoRotate: input.autoRotate ?? current.autoRotate,
     activeDays: normalizeActiveDays(input.activeDays ?? current.activeDays),
     priorityMode: normalizePriorityMode(input.priorityMode ?? current.priorityMode),
@@ -595,7 +661,7 @@ export async function updatePostgresDutyGroupRule(input: RuleUpdateInput): Promi
   if (!Number.isInteger(rule.peoplePerDay) || rule.peoplePerDay < 1) throw new Error("PEOPLE_PER_DAY_INVALID");
   await sql`
     UPDATE group_rules SET enabled_platoons = ${sql.json(rule.enabledPlatoons)}::jsonb, people_per_day = ${rule.peoplePerDay},
-      auto_rotate = ${rule.autoRotate}, active_days = ${sql.json(rule.activeDays)}::jsonb, priority_mode = ${rule.priorityMode}
+      auto_rotate = ${rule.autoRotate}, assignment_quotas = ${sql.json(rule.assignmentQuotas)}::jsonb, active_days = ${sql.json(rule.activeDays)}::jsonb, priority_mode = ${rule.priorityMode}
     WHERE group_id = ${input.groupId}
   `;
   const touched = input.expectedUpdatedAt === undefined
@@ -631,10 +697,30 @@ export async function assignPostgresPersonToDutyGroup(groupId: string, personId:
     const rule = await getDutyRule(groupId, transaction);
     const dayOfWeek = dayOfWeekFromKey(date);
     const excluded = (await transaction`SELECT 1 FROM group_exclusions WHERE group_id = ${groupId} AND person_id = ${personId} AND (day_of_week IS NULL OR day_of_week = ${dayOfWeek}) LIMIT 1`).length > 0;
-    const reason = groupAssignmentIneligibility({ groupEnabled: group.enabled, activeDays: rule.activeDays, dayOfWeek, enabledPlatoons: rule.enabledPlatoons, personPlatoonId: person.platoonId, excluded });
+    // Quotas and enabledPlatoons share one filter: wrong platoon → platoon_disabled, not OVERFILLED.
+    const reason = groupAssignmentIneligibility({
+      groupEnabled: group.enabled,
+      activeDays: rule.activeDays,
+      dayOfWeek,
+      enabledPlatoons: rulePlatoonFilter(rule),
+      personPlatoonId: person.platoonId,
+      excluded,
+    });
     if (reason) throw new GroupAssignmentIneligibleError(reason);
     const current = await getAssignmentsForGroupDate(groupId, date, transaction);
-    if (!current.some((assignment) => assignment.personId === personId) && current.length >= rule.peoplePerDay) throw new Error("GROUP_ASSIGNMENT_OVERFILLED");
+    if (!current.some((assignment) => assignment.personId === personId)) {
+      if (rule.assignmentQuotas.length > 0) {
+        const people = await allPeopleSorted(transaction);
+        const peopleById = new Map(people.map((person) => [person.id, person]));
+        const counts = quotaAssignmentCounts(rule.assignmentQuotas, current, peopleById);
+        const quotaIndex = rule.assignmentQuotas.findIndex((quota) => quota.platoonId === person.platoonId);
+        if (quotaIndex < 0 || counts[quotaIndex] >= rule.assignmentQuotas[quotaIndex].count) {
+          throw new Error("GROUP_ASSIGNMENT_OVERFILLED");
+        }
+      } else if (current.length >= rule.peoplePerDay) {
+        throw new Error("GROUP_ASSIGNMENT_OVERFILLED");
+      }
+    }
     const conflicts = await conflictRows(personId, date, groupId, transaction);
     if (conflicts.length && !allowConflict) {
       const error = new Error("GROUP_ASSIGNMENT_CONFLICT") as Error & { conflicts?: GroupConflict[] };

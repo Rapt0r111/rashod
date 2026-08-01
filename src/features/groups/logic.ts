@@ -1,6 +1,12 @@
 
 import type { Person } from "../roster/types";
-import type { GroupAssignment, GroupExclusion, GroupPriorityMode, GroupRule } from "./types";
+import type {
+  GroupAssignment,
+  GroupAssignmentQuota,
+  GroupExclusion,
+  GroupPriorityMode,
+  GroupRule,
+} from "./types";
 
 export function localDateKey(date = new Date()): string {
   const year = date.getFullYear();
@@ -79,6 +85,83 @@ export function normalizePriorityMode(value: unknown): GroupPriorityMode {
   return value === "random" ? "random" : "oldest";
 }
 
+export function normalizeAssignmentQuotas(value: unknown): GroupAssignmentQuota[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const quotas: GroupAssignmentQuota[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const source = item as { platoonId?: unknown; count?: unknown };
+    const platoonId = typeof source.platoonId === "string" ? source.platoonId.trim() : "";
+    const count = typeof source.count === "number" ? source.count : Number(source.count);
+    if (!platoonId || !Number.isInteger(count) || count < 1 || count > 40 || seen.has(platoonId)) continue;
+    seen.add(platoonId);
+    quotas.push({ platoonId, count });
+  }
+  return quotas;
+}
+
+export function quotaTotal(quotas: readonly GroupAssignmentQuota[]): number {
+  return quotas.reduce((total, quota) => total + quota.count, 0);
+}
+
+/** When quotas active — enabledPlatoons from quota units. Else keep explicit filter (incl. empty = all units). */
+export function resolveRuleEnabledPlatoons(
+  assignmentQuotas: readonly GroupAssignmentQuota[],
+  enabledPlatoons: readonly string[] | undefined,
+  currentEnabledPlatoons: readonly string[],
+): string[] {
+  if (assignmentQuotas.length > 0) {
+    return assignmentQuotas.map((quota) => quota.platoonId);
+  }
+  const source = enabledPlatoons ?? currentEnabledPlatoons;
+  return [...new Set(source.map((id) => id.trim()).filter(Boolean))];
+}
+
+export function filterPeopleByAssignmentQuotas(
+  people: Person[],
+  quotas: readonly GroupAssignmentQuota[],
+): Person[] {
+  if (quotas.length === 0) return people;
+  const platoonIds = new Set(quotas.map((quota) => quota.platoonId));
+  return people.filter((person) => platoonIds.has(person.platoonId));
+}
+
+/** Pool for one quota row. Keep same-date conflicts in pool — pickRotationCandidates falls back only if short. */
+export function selectQuotaRotationPool(
+  candidates: Person[],
+  platoonId: string,
+  assignedPersonIds: ReadonlySet<string>,
+): Person[] {
+  return candidates.filter(
+    (person) => person.platoonId === platoonId && !assignedPersonIds.has(person.id),
+  );
+}
+
+/** Platoon filter for eligibility / candidate lists when quotas may be active. */
+export function rulePlatoonFilter(
+  rule: Pick<GroupRule, "enabledPlatoons" | "assignmentQuotas">,
+): string[] {
+  return resolveRuleEnabledPlatoons(rule.assignmentQuotas, rule.enabledPlatoons, rule.enabledPlatoons);
+}
+
+export function quotaAssignmentCounts(
+  quotas: readonly GroupAssignmentQuota[],
+  assignments: Pick<GroupAssignment, "personId">[],
+  peopleById: ReadonlyMap<string, Pick<Person, "platoonId">>,
+): number[] {
+  const claimed = new Set<string>();
+  return quotas.map((quota) => {
+    let count = 0;
+    for (const assignment of assignments) {
+      if (claimed.has(assignment.personId)) continue;
+      if (peopleById.get(assignment.personId)?.platoonId !== quota.platoonId) continue;
+      claimed.add(assignment.personId);
+      count += 1;
+    }
+    return count;
+  });
+}
 function shufflePeople(candidates: Person[], random: () => number): Person[] {
   const shuffled = [...candidates];
   for (let index = shuffled.length - 1; index > 0; index -= 1) {
