@@ -716,7 +716,7 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
             )
           ) : state.ui.activeSection === "schedule" ? (
             scheduleSnapshot ? (
-              <ScheduleApp initialSnapshot={scheduleSnapshot} onOpenGroups={() => selectSection("groups")} onSnapshotChange={setScheduleSnapshot} />
+              <ScheduleApp initialSnapshot={scheduleSnapshot} canWrite={canWriteGroups} onOpenGroups={() => selectSection("groups")} onSnapshotChange={setScheduleSnapshot} />
             ) : sectionLoadErrors.schedule ? (
               <SectionLoadFailure message={sectionLoadErrors.schedule} onRetry={loadScheduleSnapshot} />
             ) : (

@@ -21,8 +21,8 @@ describe("PostgreSQL data integrity normalization", () => {
   });
 
   it("keeps the data-integrity migration in the runner order", () => {
-    expect(POSTGRES_MIGRATIONS.at(-1)).toBe("0009_group_assignment_quotas.sql");
-    expect(migrationPath("/repo", "0009_group_assignment_quotas.sql")).toContain("drizzle");
+    expect(POSTGRES_MIGRATIONS.at(-1)).toBe("0010_group_overlap_policy.sql");
+    expect(migrationPath("/repo", "0010_group_overlap_policy.sql")).toContain("drizzle");
   });
 
   it("writes overview settings as a JSON object, not a JSONB string", () => {

@@ -1,6 +1,6 @@
 import type { DutyGroup, GroupAssignment } from "../groups/types";
 
-export const MAX_SCHEDULE_DAYS = 31;
+export const MAX_SCHEDULE_DAYS = 366;
 
 export function isDateKey(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -9,12 +9,12 @@ export function isDateKey(value: string): boolean {
   return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
 }
 
-function dateFromKey(value: string) {
+export function dateFromKey(value: string) {
   const [year, month, day] = value.split("-").map(Number);
   return new Date(year, month - 1, day);
 }
 
-function dateKey(value: Date) {
+export function dateKey(value: Date) {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
 }
 
@@ -35,7 +35,41 @@ export function scheduleDateRange(from: string, to: string, maxDays = MAX_SCHEDU
 
 export function defaultScheduleRange(now = new Date()) {
   const from = dateKey(now);
-  return { from, to: dateKeyPlus(from, 7) };
+  return { from, to: dateKeyPlus(from, 6) };
+}
+
+export type SchedulePreset = "today" | "seven" | "week" | "thirty" | "month" | "year";
+
+export function schedulePresetRange(preset: SchedulePreset, now = new Date()) {
+  const today = dateKey(now);
+  if (preset === "today") return { from: today, to: today };
+  if (preset === "seven") return { from: today, to: dateKeyPlus(today, 6) };
+  if (preset === "thirty") return { from: today, to: dateKeyPlus(today, 29) };
+  if (preset === "week") {
+    const mondayOffset = (now.getDay() + 6) % 7;
+    const from = dateKeyPlus(today, -mondayOffset);
+    return { from, to: dateKeyPlus(from, 6) };
+  }
+  if (preset === "month") {
+    const fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    const toDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return { from: dateKey(fromDate), to: dateKey(toDate) };
+  }
+  return {
+    from: dateKey(new Date(now.getFullYear(), 0, 1)),
+    to: dateKey(new Date(now.getFullYear(), 11, 31)),
+  };
+}
+
+export function scheduleMonthKey(value: string) {
+  return value.slice(0, 7);
+}
+
+export function scheduleMonthLabel(value: string) {
+  const [year, month] = value.split("-").map(Number);
+  return new Intl.DateTimeFormat("ru-RU", { month: "short", year: "numeric" })
+    .format(new Date(year, month - 1, 1))
+    .replace(" г.", "");
 }
 
 export function scheduleDateLabel(value: string) {

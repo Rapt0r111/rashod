@@ -4,6 +4,9 @@ import {
   assignmentsForCell,
   compactDutyLabel,
   defaultScheduleRange,
+  schedulePresetRange,
+  scheduleMonthKey,
+  scheduleMonthLabel,
   scheduleDateRange,
   scheduleDateLabel,
 } from "@/features/schedule/logic";
@@ -37,6 +40,7 @@ const snapshot: ScheduleSnapshot = {
     createdAt: 0,
     updatedAt: 0,
   }],
+  groupRules: {},
   assignments: [{
     id: "assignment-1",
     groupId: "group-1",
@@ -55,12 +59,23 @@ const snapshot: ScheduleSnapshot = {
 describe("schedule logic", () => {
   it("builds a bounded inclusive date range", () => {
     expect(scheduleDateRange("2026-07-27", "2026-08-03")).toHaveLength(8);
-    expect(scheduleDateRange("2026-07-27", "2026-08-27")).toBeNull();
+    expect(scheduleDateRange("2026-07-27", "2026-08-27")).toHaveLength(32);
+    expect(scheduleDateRange("2026-07-27", "2027-07-28")).toBeNull();
     expect(scheduleDateRange("2026-02-29", "2026-03-01")).toBeNull();
   });
 
-  it("uses today plus seven days as the default print period", () => {
-    expect(defaultScheduleRange(new Date(2026, 6, 27))).toEqual({ from: "2026-07-27", to: "2026-08-03" });
+  it("uses exactly seven calendar dates as the default print period", () => {
+    expect(defaultScheduleRange(new Date(2026, 6, 27))).toEqual({ from: "2026-07-27", to: "2026-08-02" });
+  });
+
+  it("provides practical week, month and year presets", () => {
+    const now = new Date(2026, 7, 12);
+    expect(schedulePresetRange("seven", now)).toEqual({ from: "2026-08-12", to: "2026-08-18" });
+    expect(schedulePresetRange("week", now)).toEqual({ from: "2026-08-10", to: "2026-08-16" });
+    expect(schedulePresetRange("month", now)).toEqual({ from: "2026-08-01", to: "2026-08-31" });
+    expect(schedulePresetRange("year", now)).toEqual({ from: "2026-01-01", to: "2026-12-31" });
+    expect(scheduleMonthKey("2026-08-12")).toBe("2026-08");
+    expect(scheduleMonthLabel("2026-08")).toContain("2026");
   });
 
   it("keeps compact duty labels and exact cell lookup deterministic", () => {

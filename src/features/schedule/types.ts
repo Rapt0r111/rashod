@@ -1,5 +1,5 @@
 import type { Person, Platoon } from "../roster/types";
-import type { DutyGroup, GroupAssignment } from "../groups/types";
+import type { DutyGroup, GroupAssignment, GroupRule } from "../groups/types";
 
 export type ScheduleSnapshot = {
   from: string;
@@ -8,5 +8,6 @@ export type ScheduleSnapshot = {
   people: Person[];
   platoons: Platoon[];
   groups: DutyGroup[];
+  groupRules: Record<string, GroupRule>;
   assignments: GroupAssignment[];
 };

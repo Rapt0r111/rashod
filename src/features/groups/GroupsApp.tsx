@@ -27,7 +27,7 @@ import {
   conscriptionLabel,
   getInitials,
 } from "../roster/utils";
-import type { GroupConflict, GroupsSnapshot } from "./types";
+import type { GroupsSnapshot, RuleUpdateInput } from "./types";
 import {
   colorTokenClass,
   DAY_NAMES,
@@ -35,7 +35,7 @@ import {
 } from "./utils";
 import {
   GroupApiError,
-  assignGroupPerson,
+  assignGroupPersonRange,
   createGroup,
   deleteGroup,
   excludeGroupPerson,
@@ -62,10 +62,8 @@ type GroupsAppProps = {
   canWrite?: boolean;
 };
 
-type PendingConflict = {
-  personId: string;
-  conflicts: GroupConflict[];
-} | null;
+type RuleSavePayload = Omit<RuleUpdateInput, "groupId" | "expectedUpdatedAt">;
+type PendingRuleCleanup = { payload: RuleSavePayload; count: number } | null;
 
 const groupSortOptions: SearchSortOption[] = [
   { key: "alpha", label: "А–Я" },
@@ -84,11 +82,10 @@ export function GroupsApp({
   );
   const [isBusy, setBusy] = useState(false);
   const [isRefreshing, setRefreshing] = useState(false);
-  const [isLiveRefreshUnavailable, setLiveRefreshUnavailable] = useState(false);
   const [isCreateOpen, setCreateOpen] = useState(false);
   const [isAssignOpen, setAssignOpen] = useState(false);
   const [isExcludeOpen, setExcludeOpen] = useState(false);
-  const [pendingConflict, setPendingConflict] = useState<PendingConflict>(null);
+  const [pendingRuleCleanup, setPendingRuleCleanup] = useState<PendingRuleCleanup>(null);
   const [platoons, setPlatoons] = useState<Platoon[]>(initialSnapshot.platoons);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -186,8 +183,7 @@ export function GroupsApp({
     if (showProgress) setRefreshing(true);
     try {
       const next = await fetchGroupsSnapshot();
-      // Do not clear live-unavailable here: SSE may still be degraded/closed.
-      // Banner is driven only by liveStatus effect below.
+      // Do not clear the live-unavailable banner here: SSE may still be degraded/closed.
       if (revision === snapshotRevisionRef.current) {
         applySnapshot(next);
         if (showProgress && isMountedRef.current) setError(null);
@@ -224,16 +220,13 @@ export function GroupsApp({
     },
   );
 
-  useEffect(() => {
-    if (liveStatus === "open") setLiveRefreshUnavailable(false);
-    // Terminal close or prolonged reconnect (degraded) both map to "error".
-    if (liveStatus === "error") setLiveRefreshUnavailable(true);
-  }, [liveStatus]);
+  const isLiveRefreshUnavailable = liveStatus === "error";
 
   async function run(
     action: () => Promise<GroupsSnapshot>,
     message = "Операция не выполнена",
     successMessage = "Изменения сохранены",
+    rethrowErrors = false,
   ) {
     if (!canWrite || isMutatingRef.current) return null;
     isMutatingRef.current = true;
@@ -251,6 +244,7 @@ export function GroupsApp({
       return next;
     } catch (error) {
       if (isMountedRef.current) setError(getGroupErrorMessage(error, message));
+      if (rethrowErrors) throw error;
       return null;
     } finally {
       isMutatingRef.current = false;
@@ -258,48 +252,69 @@ export function GroupsApp({
     }
   }
 
-  async function assignPerson(personId: string, allowConflict = false) {
+  async function assignPerson(personId: string, from = effectiveSelectedDate, to = effectiveSelectedDate) {
     if (!canWrite || isMutatingRef.current) return;
-    if (!activeGroupId || !effectiveSelectedDate) return;
+    if (!activeGroupId || !from || !to) return;
     isMutatingRef.current = true;
     const revision = ++snapshotRevisionRef.current;
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
-      const next = await assignGroupPerson(
+      const result = await assignGroupPersonRange(
         activeGroupId,
         personId,
-        effectiveSelectedDate,
-        allowConflict,
+        from,
+        to,
       );
       if (revision === snapshotRevisionRef.current) {
-        applySnapshot(next);
+        applySnapshot(result.snapshot);
         snapshotRevisionRef.current += 1;
       }
       if (isMountedRef.current) {
         setAssignOpen(false);
-        setPendingConflict(null);
+        const skipped = result.skippedDates.length;
         setNotice(
-          allowConflict
-            ? "Назначение добавлено с подтверждённым пересечением."
-            : "Человек назначен.",
+          result.assignedDates.length > 0
+            ? `Человек назначен на ${result.assignedDates.length} дат${skipped ? `. Пропущено дат: ${skipped}.` : "."}`
+            : "Подходящих дат для назначения не найдено.",
         );
       }
     } catch (err) {
-      if (
-        err instanceof GroupApiError &&
-        err.code === "GROUP_ASSIGNMENT_CONFLICT" &&
-        err.conflicts.length > 0 &&
-        isMountedRef.current
-      ) {
-        setPendingConflict({ personId, conflicts: err.conflicts });
-      } else if (isMountedRef.current) {
+      if (isMountedRef.current) {
         setError(getGroupErrorMessage(err, "Назначение не выполнено"));
       }
     } finally {
       isMutatingRef.current = false;
       if (isMountedRef.current) setBusy(false);
+    }
+  }
+
+  async function saveRule(payload: RuleSavePayload) {
+    if (!activeSnapshot) return null;
+    try {
+      const result = await run(
+        () =>
+          updateRule({
+            groupId: activeSnapshot.group.id,
+            expectedUpdatedAt: activeSnapshot.group.updatedAt,
+            ...payload,
+          }),
+        "Правила не сохранены",
+        "Правила группы сохранены.",
+        true,
+      );
+      setPendingRuleCleanup(null);
+      return result;
+    } catch (error) {
+      if (
+        error instanceof GroupApiError &&
+        error.code === "GROUP_OVERLAP_CLEANUP_REQUIRED"
+      ) {
+        setError(null);
+        setPendingRuleCleanup({ payload, count: error.cleanupCount });
+      }
+      return null;
     }
   }
 
@@ -319,6 +334,35 @@ export function GroupsApp({
         >
           <CheckIcon size={16} weight="bold" />
           <span className="min-w-0 wrap-anywhere">{notice}</span>
+        </div>
+      )}
+      {pendingRuleCleanup && activeSnapshot && (
+        <div
+          className="grid gap-2 rounded-[12px] border border-[oklch(78%_0.16_74/0.38)] bg-[oklch(78%_0.16_74/0.1)] px-3 py-2.5 text-sm text-amber"
+          role="alert"
+        >
+          <strong>Включение строгого режима удалит {pendingRuleCleanup.count} конфликтующих назначений.</strong>
+          <span className="text-xs text-text-secondary">
+            Назначения в группе «{activeSnapshot.group.name}» сохранятся, остальные дубли за те же даты будут удалены.
+          </span>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="min-h-8.5 rounded-lg border border-line px-2.5 text-xs font-bold text-text-secondary"
+              onClick={() => setPendingRuleCleanup(null)}
+              disabled={isBusy}
+            >
+              Отмена
+            </button>
+            <button
+              type="button"
+              className="min-h-8.5 rounded-lg border border-amber/55 bg-amber/18 px-2.5 text-xs font-extrabold text-text-primary"
+              onClick={() => void saveRule({ ...pendingRuleCleanup.payload, confirmOverlapCleanup: true })}
+              disabled={isBusy}
+            >
+              Удалить дубли и сохранить
+            </button>
+          </div>
         </div>
       )}
       <header className="grid min-w-0 items-center gap-3 border-b border-line pb-3.5 lg:grid-cols-[minmax(0,1fr)_auto]">
@@ -438,7 +482,10 @@ export function GroupsApp({
                     key={group.id}
                     type="button"
                     className={`grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 rounded-xl border border-(--tone-line) bg-[oklch(100%_0_0/0.035)] px-2.5 py-2 text-left text-text-primary transition-[border-color,background,transform] duration-200 hover:border-accent-line hover:bg-[oklch(100%_0_0/0.065)] cursor-pointer active:translate-y-px ${activeGroupId === group.id ? "border-(--tone-line) bg-(--tone-soft)" : ""} ${colorTokenClass(item?.template.colorToken ?? "neutral")}`}
-                    onClick={() => setActiveGroupId(group.id)}
+                    onClick={() => {
+                      setPendingRuleCleanup(null);
+                      setActiveGroupId(group.id);
+                    }}
                     aria-pressed={activeGroupId === group.id}
                     title={group.name}
                   >
@@ -615,22 +662,11 @@ export function GroupsApp({
 
         {activeSnapshot && canWrite && (
           <SettingsPanel
-            key={`${activeSnapshot.group.id}:${activeSnapshot.group.updatedAt}:${activeSnapshot.rule.peoplePerDay}:${activeSnapshot.rule.assignmentQuotas.map((quota) => quota.platoonId + "-" + quota.count).join(",")}:${activeSnapshot.rule.autoRotate}:${activeSnapshot.rule.activeDays.join("-")}:${activeSnapshot.rule.enabledPlatoons.join("-")}:${activeSnapshot.rule.priorityMode}`}
+            key={`${activeSnapshot.group.id}:${activeSnapshot.group.updatedAt}:${activeSnapshot.rule.peoplePerDay}:${activeSnapshot.rule.assignmentQuotas.map((quota) => quota.platoonId + "-" + quota.count).join(",")}:${activeSnapshot.rule.autoRotate}:${activeSnapshot.rule.activeDays.join("-")}:${activeSnapshot.rule.enabledPlatoons.join("-")}:${activeSnapshot.rule.priorityMode}:${activeSnapshot.rule.overlapPolicy}`}
             item={activeSnapshot}
             platoons={platoons}
             isBusy={isBusy}
-            onSave={(payload) =>
-              run(
-                () =>
-                  updateRule({
-                    groupId: activeSnapshot.group.id,
-                    expectedUpdatedAt: activeSnapshot.group.updatedAt,
-                    ...payload,
-                  }),
-                  "Правила не сохранены",
-                  "Правила группы сохранены.",
-                )
-            }
+            onSave={saveRule}
             onRename={(payload) =>
               run(
                 () =>
@@ -679,18 +715,13 @@ export function GroupsApp({
         <PersonPickerPanel
           title="Назначить вручную"
           people={selectedAvailablePeople}
-          selectedDate={effectiveSelectedDate}
+          candidatePeople={activeSnapshot.candidatePeople}
+          availablePeopleByDate={activeSnapshot.availablePeopleByDate}
+          initialDate={effectiveSelectedDate}
           onClose={() => {
             setAssignOpen(false);
-            setPendingConflict(null);
           }}
-          onPick={(personId) => assignPerson(personId)}
-          pendingConflict={pendingConflict}
-          onConfirmConflict={() =>
-            pendingConflict
-              ? assignPerson(pendingConflict.personId, true)
-              : undefined
-          }
+          onPick={(personId, from, to) => void assignPerson(personId, from, to)}
           isBusy={isBusy}
         />
       )}

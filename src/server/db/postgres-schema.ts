@@ -59,11 +59,12 @@ export const dutyGroups = pgTable("duty_groups", {
 }, (table) => [index("idx_duty_groups_template").on(table.templateId)]);
 export const groupRules = pgTable("group_rules", {
   id: id(), groupId: text("group_id").notNull().references(() => dutyGroups.id, { onDelete: "cascade", onUpdate: "cascade" }).unique(),
-  enabledPlatoons: jsonb("enabled_platoons").$type<string[]>().notNull(), peoplePerDay: integer("people_per_day").notNull(), assignmentQuotas: jsonb("assignment_quotas").$type<Array<{ platoonId: string; count: number }>>().notNull().default([]), autoRotate: boolean("auto_rotate").notNull().default(true), activeDays: jsonb("active_days").$type<number[]>().notNull(), priorityMode: text("priority_mode").notNull(),
+  enabledPlatoons: jsonb("enabled_platoons").$type<string[]>().notNull(), peoplePerDay: integer("people_per_day").notNull(), assignmentQuotas: jsonb("assignment_quotas").$type<Array<{ platoonId: string; count: number }>>().notNull().default([]), autoRotate: boolean("auto_rotate").notNull().default(true), activeDays: jsonb("active_days").$type<number[]>().notNull(), priorityMode: text("priority_mode").notNull(), overlapPolicy: text("overlap_policy").notNull().default("exclusive"),
 }, (table) => [
   check("chk_group_rules_active_days_array", sql`jsonb_typeof(${table.activeDays}) = 'array'`),
   check("chk_group_rules_enabled_platoons_array", sql`jsonb_typeof(${table.enabledPlatoons}) = 'array'`),
   check("chk_group_rules_assignment_quotas_array", sql`jsonb_typeof(${table.assignmentQuotas}) = 'array'`),
+  check("chk_group_rules_overlap_policy", sql`${table.overlapPolicy} IN ('exclusive', 'manual')`),
 ]);
 export const groupAssignments = pgTable("group_assignments", {
   id: id(), groupId: text("group_id").notNull().references(() => dutyGroups.id, { onDelete: "cascade", onUpdate: "cascade" }), personId: text("person_id").notNull().references(() => people.id, { onDelete: "cascade", onUpdate: "cascade" }),

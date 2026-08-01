@@ -4,9 +4,24 @@ import type {
   GroupAssignment,
   GroupAssignmentQuota,
   GroupExclusion,
+  GroupOverlapPolicy,
   GroupPriorityMode,
   GroupRule,
 } from "./types";
+
+export function normalizeOverlapPolicy(value: unknown): GroupOverlapPolicy {
+  return value === "manual" ? "manual" : "exclusive";
+}
+
+export function classifyOverlap(
+  ownPolicy: GroupOverlapPolicy,
+  otherPolicy: GroupOverlapPolicy,
+  otherSource: "auto" | "manual",
+): "blocking" | "allowed" {
+  return ownPolicy === "manual" && otherPolicy === "manual" && otherSource === "manual"
+    ? "allowed"
+    : "blocking";
+}
 
 export function localDateKey(date = new Date()): string {
   const year = date.getFullYear();

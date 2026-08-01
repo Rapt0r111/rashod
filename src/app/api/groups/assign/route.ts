@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
   assignPostgresPersonToDutyGroup as assignPersonToDutyGroup,
+  assignPostgresPersonToDutyGroupRange as assignPersonToDutyGroupRange,
   GroupAssignmentIneligibleError,
   removePostgresDutyAssignment as removeDutyAssignment,
 } from "@/server/db/postgres-groups-repository";
@@ -15,20 +16,37 @@ const postSchema = z.object({
   groupId: idString,
   personId: idString,
   date: dateString.optional(),
-  allowConflict: z.boolean().optional(),
-});
+  from: dateString.optional(),
+  to: dateString.optional(),
+}).refine(
+  (input) => Boolean(input.date) !== Boolean(input.from || input.to),
+  "ASSIGNMENT_DATE_RANGE_REQUIRED",
+).refine(
+  (input) => Boolean(input.from) === Boolean(input.to),
+  "ASSIGNMENT_DATE_RANGE_INCOMPLETE",
+);
 const deleteSchema = z.object({ assignmentId: idString });
 
 export async function POST(request: Request) {
   const auth = await requirePermission(request, "groups:write");
   if (auth instanceof NextResponse) return auth;
   try {
-    const { groupId, personId, date, allowConflict } = await parseJson(request, postSchema);
+    const { groupId, personId, date, from, to } = await parseJson(request, postSchema);
+    if (from && to) {
+      const result = await runAuditedMutation(
+        auth,
+        "groups.assignments.range_created",
+        () => assignPersonToDutyGroupRange(groupId, personId, from, to),
+        { personId, groupId, from, to },
+      );
+      publishRosterChanged("groups");
+      return NextResponse.json(result);
+    }
     const snapshot = await runAuditedMutation(
       auth,
       "groups.assignment.created",
-      () => assignPersonToDutyGroup(groupId, personId, date, allowConflict ?? false),
-      { personId, groupId, date, allowConflict: allowConflict ?? false },
+      () => assignPersonToDutyGroup(groupId, personId, date),
+      { personId, groupId, date },
     );
     publishRosterChanged("groups");
     return NextResponse.json(snapshot);

@@ -18,6 +18,8 @@ const schema = z.object({
   autoRotate: z.boolean().optional(),
   activeDays: uniqueArray(z.number().int().min(0).max(6), 7).optional(),
   priorityMode: z.enum(["oldest", "random"]).optional(),
+  overlapPolicy: z.enum(["exclusive", "manual"]).optional(),
+  confirmOverlapCleanup: z.boolean().optional(),
 });
 
 export async function PUT(request: Request) {
@@ -34,6 +36,12 @@ export async function PUT(request: Request) {
     publishRosterChanged("groups");
     return NextResponse.json(snapshot);
   } catch (error) {
-    return apiError(error);
+    const maybeCleanup = error as Error & { cleanupCount?: number; conflicts?: unknown };
+    return apiError(error, {
+      status: maybeCleanup.message === "GROUP_OVERLAP_CLEANUP_REQUIRED" ? 409 : undefined,
+      extra: maybeCleanup.message === "GROUP_OVERLAP_CLEANUP_REQUIRED"
+        ? { cleanupCount: maybeCleanup.cleanupCount ?? 0, conflicts: maybeCleanup.conflicts ?? [] }
+        : undefined,
+    });
   }
 }

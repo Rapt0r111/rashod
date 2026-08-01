@@ -68,8 +68,8 @@ describe("Groups responsive UI contract", () => {
     );
 
     expect(mutationSource).toContain("catch (error) {");
-    expect(mutationSource).toContain("setError(getGroupErrorMessage(error, message));");
-    expect(mutationSource).not.toContain("throw err");
+    expect(groupsSource).toContain("getGroupErrorMessage(err, \"Назначение не выполнено\")");
+    expect(mutationSource).toContain("if (rethrowErrors) throw error;");
   });
 
   it("offers an explicit recovery after a failed Groups action", () => {
@@ -83,7 +83,8 @@ describe("Groups responsive UI contract", () => {
     expect(groupsSource).toContain('role="status"');
     expect(groupsSettingsSource).toContain("Удалить группу?");
     expect(groupsSettingsSource).toContain("без возможности отмены");
-    expect(groupsPickerSource).toContain("Назначить с конфликтом");
+    expect(groupsPickerSource).not.toContain("Назначить с конфликтом");
+    expect(groupsSettingsSource).toContain("Разрешать ручное совмещение");
     expect(groupsUiSource).not.toContain("window.confirm");
   });
 
@@ -92,8 +93,7 @@ describe("Groups responsive UI contract", () => {
     expect(groupsSource).toContain("if (!canWrite || isMutatingRef.current) return null;");
     expect(groupsSource).toContain("const snapshotRevisionRef = useRef(0);");
     expect(groupsSource).toContain("if (revision === snapshotRevisionRef.current)");
-    expect(groupsSource).toContain('err.code === "GROUP_ASSIGNMENT_CONFLICT"');
-    expect(groupsSource).toContain("err.conflicts.length > 0");
+    expect(groupsSource).toContain("getGroupErrorMessage(err,");
     expect(groupsSource).toContain("expectedUpdatedAt: activeSnapshot.group.updatedAt");
   });
 
@@ -111,8 +111,16 @@ describe("Groups responsive UI contract", () => {
 
   it("keeps no-template and no-candidate states actionable", () => {
     expect(groupsCreateSource).toContain("Нет шаблонов для группы");
-    expect(groupsPickerSource).toContain("Нет кандидатов на выбранную дату");
-    expect(groupsPickerSource).toContain("Проверьте исключения и правила группы или выберите другую дату.");
+    expect(groupsPickerSource).toContain("Нет кандидатов на выбранный период");
+    expect(groupsPickerSource).toContain("Проверьте исключения и правила группы или выберите другой период.");
+  });
+
+  it("supports one-date and range assignment from the Groups picker", () => {
+    expect(groupsSource).toContain("assignGroupPersonRange");
+    expect(groupsSource).toContain("from = effectiveSelectedDate");
+    expect(groupsPickerSource).toContain("schedulePresetRange");
+    expect(groupsPickerSource).toContain('["month", "Месяц"]');
+    expect(groupsPickerSource).toContain('type="date"');
   });
 
   it("bounds editable group text and preserves dialog semantics", () => {
@@ -131,7 +139,7 @@ describe("Groups responsive UI contract", () => {
     expect(groupsSource).toContain("availablePeopleByDate[effectiveSelectedDate]");
     expect(groupsSource).toContain("rotateGroup(activeSnapshot.group.id, effectiveSelectedDate)");
     expect(groupsSource).toContain("effectiveSelectedDate");
-    expect(groupsSource).toContain("allowConflict");
+    expect(groupsSource).not.toContain("allowConflict");
   });
 
   it("labels inactive week days without relying on opacity alone", () => {

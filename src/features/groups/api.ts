@@ -1,6 +1,7 @@
 import { ApiError, fetchJson, getApiErrorMessage as getBaseApiErrorMessage } from "@/lib/api-client";
 import type {
   GroupConflict,
+  GroupAssignmentRangeResult,
   GroupCreateInput,
   GroupsSnapshot,
   GroupUpdateInput,
@@ -12,12 +13,14 @@ export class GroupApiError extends Error {
   conflicts: GroupConflict[];
   code: string;
   reason?: string;
+  cleanupCount: number;
 
   constructor(
     message: string,
     status: number,
     conflicts: GroupConflict[] = [],
     reason?: string,
+    cleanupCount = 0,
   ) {
     super(message);
     this.name = "GroupApiError";
@@ -25,6 +28,7 @@ export class GroupApiError extends Error {
     this.conflicts = conflicts;
     this.code = message;
     this.reason = reason;
+    this.cleanupCount = cleanupCount;
   }
 }
 
@@ -46,7 +50,12 @@ function toGroupApiError(error: unknown): never {
       typeof (payload as { reason: unknown }).reason === "string"
         ? (payload as { reason: string }).reason
         : undefined;
-    throw new GroupApiError(error.code, error.status, conflicts, reason);
+    const cleanupCount =
+      payload && typeof payload === "object" && "cleanupCount" in payload &&
+      typeof (payload as { cleanupCount: unknown }).cleanupCount === "number"
+        ? (payload as { cleanupCount: number }).cleanupCount
+        : 0;
+    throw new GroupApiError(error.code, error.status, conflicts, reason, cleanupCount);
   }
   throw error;
 }
@@ -73,6 +82,14 @@ export function getGroupErrorMessage(error: unknown, fallback: string) {
 
   if (error.code === "GROUP_ASSIGNMENT_OVERFILLED") {
     return "На выбранную дату уже назначено нужное количество людей.";
+  }
+
+  if (error.code === "GROUP_OVERLAP_CLEANUP_REQUIRED") {
+    return `Для строгого режима нужно удалить ${error.cleanupCount} конфликтующих назначений. Подтвердите операцию.`;
+  }
+
+  if (error.code === "GROUP_ASSIGNMENT_CONFLICT") {
+    return "Назначение заблокировано: человек уже назначен в другую строгую группу на эту дату.";
   }
 
   return getBaseApiErrorMessage(
@@ -132,11 +149,22 @@ export function assignGroupPerson(
   groupId: string,
   personId: string,
   date?: string,
-  allowConflict = false,
 ): Promise<GroupsSnapshot> {
   return fetchGroupJson<GroupsSnapshot>("/api/groups/assign", {
     method: "POST",
-    body: JSON.stringify({ groupId, personId, date, allowConflict }),
+    body: JSON.stringify({ groupId, personId, date }),
+  });
+}
+
+export function assignGroupPersonRange(
+  groupId: string,
+  personId: string,
+  from: string,
+  to: string,
+): Promise<GroupAssignmentRangeResult> {
+  return fetchGroupJson<GroupAssignmentRangeResult>("/api/groups/assign", {
+    method: "POST",
+    body: JSON.stringify({ groupId, personId, from, to }),
   });
 }
 

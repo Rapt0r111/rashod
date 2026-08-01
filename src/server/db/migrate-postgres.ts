@@ -13,6 +13,7 @@ export const POSTGRES_MIGRATIONS = [
   "0007_performance_indexes.sql",
   "0008_location_counts_as_present.sql",
   "0009_group_assignment_quotas.sql",
+  "0010_group_overlap_policy.sql",
 ] as const;
 
 type MigrationName = (typeof POSTGRES_MIGRATIONS)[number];
@@ -25,7 +26,7 @@ const REQUIRED_SCHEMA: Record<string, readonly string[]> = {
   movement_logs: ["id", "person_id", "name", "from_value", "to_value", "occurred_at"],
   group_templates: ["id", "key", "name", "color_token", "icon", "default_people_per_day", "default_active_days", "sort_order", "is_system", "created_at"],
   duty_groups: ["id", "template_id", "name", "notes", "enabled", "sort_order", "created_at", "updated_at"],
-  group_rules: ["id", "group_id", "enabled_platoons", "people_per_day", "assignment_quotas", "auto_rotate", "active_days", "priority_mode"],
+  group_rules: ["id", "group_id", "enabled_platoons", "people_per_day", "assignment_quotas", "auto_rotate", "active_days", "priority_mode", "overlap_policy"],
   group_assignments: ["id", "group_id", "person_id", "assigned_date", "source", "conflict_state", "created_at"],
   group_exclusions: ["id", "group_id", "person_id", "day_of_week", "reason", "created_at"],
   users: ["id", "username", "password_hash", "display_name", "active", "session_version", "created_at", "updated_at"],
@@ -49,7 +50,7 @@ const INITIAL_SCHEMA = Object.fromEntries(
         : table === "locations"
           ? columns.filter((column) => column !== "counts_as_present")
           : table === "group_rules"
-            ? columns.filter((column) => column !== "assignment_quotas")
+            ? columns.filter((column) => column !== "assignment_quotas" && column !== "overlap_policy")
             : columns,
     ]),
 );
@@ -59,6 +60,8 @@ const REQUIRED_CONSTRAINTS = [
   "chk_group_rules_active_days_array",
   "chk_group_rules_enabled_platoons_array",
   "chk_group_rules_assignment_quotas_array",
+  "chk_group_rules_overlap_policy",
+  "chk_group_assignments_conflict_state",
   "chk_overview_settings_config_object",
 ] as const;
 const REQUIRED_INDEXES = [

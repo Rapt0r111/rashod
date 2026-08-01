@@ -6,6 +6,8 @@ import type {
   DutyGroup,
   DutyGroupSnapshot,
   GroupAssignment,
+  GroupAssignmentRangeResult,
+  GroupAssignmentRangeSkip,
   GroupConflict,
   GroupCreateInput,
   GroupDaySnapshot,
@@ -24,6 +26,8 @@ import {
   filterPeopleByAssignmentQuotas,
   localDateKey,
   normalizeAssignmentQuotas,
+  normalizeOverlapPolicy,
+  classifyOverlap,
   quotaAssignmentCounts,
   quotaTotal,
   normalizePriorityMode,
@@ -33,16 +37,18 @@ import {
   selectQuotaRotationPool,
   weekDates,
 } from "@/features/groups/logic";
+import { scheduleDateRange } from "@/features/schedule/logic";
 import { inPostgresTransaction, pg } from "./postgres";
 
 type DbPerson = Omit<Person, "createdAt" | "updatedAt"> & { created_at: Date; updated_at: Date };
 type DbTemplate = Omit<GroupTemplate, "createdAt" | "defaultActiveDays"> & { defaultActiveDays: unknown; created_at: Date };
 type DbGroup = Omit<DutyGroup, "createdAt" | "updatedAt"> & { created_at: Date; updated_at: Date };
-type DbRule = Omit<GroupRule, "enabledPlatoons" | "activeDays" | "priorityMode" | "assignmentQuotas"> & {
+type DbRule = Omit<GroupRule, "enabledPlatoons" | "activeDays" | "priorityMode" | "assignmentQuotas" | "overlapPolicy"> & {
   enabledPlatoons: unknown;
   assignmentQuotas: unknown;
   activeDays: unknown;
   priorityMode: unknown;
+  overlapPolicy: unknown;
 };
 type DbAssignment = Omit<GroupAssignment, "personName" | "personRank" | "personConscriptionNumber" | "conflicts" | "source" | "conflictState" | "createdAt"> & {
   source: string;
@@ -59,6 +65,7 @@ type SnapshotRuleRow = {
   autoRotate: boolean | null;
   activeDays: unknown;
   priorityMode: unknown;
+  overlapPolicy: unknown;
   defaultPeoplePerDay: number;
   defaultActiveDays: unknown;
 };
@@ -73,6 +80,13 @@ type SnapshotExclusionRow = DbExclusion & {
   personConscriptionNumber: string | null;
 };
 type SqlExecutor = ReturnType<typeof pg> | postgres.TransactionSql;
+type RotationAssignment = Pick<GroupAssignment, "id" | "personId" | "assignedDate" | "source">;
+type RotationContext = {
+  people: Person[];
+  exclusionsByGroup: Map<string, GroupExclusion[]>;
+  historyByGroup: Map<string, RotationAssignment[]>;
+  assignedByDate: Map<string, Array<{ id: string; groupId: string; personId: string }>>;
+};
 export type GroupAssignmentIneligibilityReason = "excluded" | "platoon_disabled" | "inactive_day" | "group_disabled";
 export function groupAssignmentIneligibility(input: { groupEnabled: boolean; activeDays: readonly number[]; dayOfWeek: number; enabledPlatoons: readonly string[]; personPlatoonId: string; excluded: boolean }): GroupAssignmentIneligibilityReason | null { if (!input.groupEnabled) return "group_disabled"; if (!input.activeDays.includes(input.dayOfWeek)) return "inactive_day"; if (input.enabledPlatoons.length > 0 && !input.enabledPlatoons.includes(input.personPlatoonId)) return "platoon_disabled"; if (input.excluded) return "excluded"; return null; }
 export class GroupAssignmentIneligibleError extends Error { constructor(public readonly reason: GroupAssignmentIneligibilityReason) { super("GROUP_ASSIGNMENT_INELIGIBLE"); this.name = "GroupAssignmentIneligibleError"; } }
@@ -152,6 +166,7 @@ function toRule(row: DbRule): GroupRule {
     autoRotate: row.autoRotate,
     activeDays: normalizeActiveDays(row.activeDays),
     priorityMode: normalizePriorityMode(row.priorityMode),
+    overlapPolicy: normalizeOverlapPolicy(row.overlapPolicy),
   };
 }
 
@@ -192,7 +207,7 @@ async function getPlatoons(): Promise<Platoon[]> {
 async function getDutyRule(groupId: string, sql: SqlExecutor = pg()): Promise<GroupRule> {
   const rows = await sql<DbRule[]>`
     SELECT id, group_id AS "groupId", enabled_platoons AS "enabledPlatoons", people_per_day AS "peoplePerDay",
-      assignment_quotas AS "assignmentQuotas", auto_rotate AS "autoRotate", active_days AS "activeDays", priority_mode AS "priorityMode"
+      assignment_quotas AS "assignmentQuotas", auto_rotate AS "autoRotate", active_days AS "activeDays", priority_mode AS "priorityMode", overlap_policy AS "overlapPolicy"
     FROM group_rules WHERE group_id = ${groupId}
   `;
   if (rows[0]) return toRule(rows[0]);
@@ -212,6 +227,7 @@ async function getDutyRule(groupId: string, sql: SqlExecutor = pg()): Promise<Gr
     autoRotate: true,
     activeDays: normalizeActiveDays(defaults[0].defaultActiveDays),
     priorityMode: "oldest",
+    overlapPolicy: "exclusive",
   };
   // Snapshot reads must stay side-effect free. Explicit write paths create a
   // missing rule before updating it; a legacy missing rule can still render
@@ -233,13 +249,30 @@ async function getDutyExclusions(groupId: string, sql: SqlExecutor = pg()): Prom
 }
 
 async function conflictRows(personId: string, date: string, ownGroupId?: string, sql: SqlExecutor = pg()): Promise<GroupConflict[]> {
-  const rows = await sql<Array<{ groupId: string; groupName: string; assignedDate: string | Date }>>`
-    SELECT ga.group_id AS "groupId", dg.name AS "groupName", ga.assigned_date AS "assignedDate"
+  const [ownGroup] = ownGroupId
+    ? await sql<Array<{ overlapPolicy: unknown }>>`
+        SELECT COALESCE(overlap_policy, 'exclusive') AS "overlapPolicy"
+        FROM group_rules WHERE group_id = ${ownGroupId}
+      `
+    : [{ overlapPolicy: "exclusive" }];
+  const rows = await sql<Array<{ groupId: string; groupName: string; assignedDate: string | Date; source: string; overlapPolicy: unknown }>>`
+    SELECT ga.group_id AS "groupId", dg.name AS "groupName", ga.assigned_date AS "assignedDate",
+      ga.source, COALESCE(gr.overlap_policy, 'exclusive') AS "overlapPolicy"
     FROM group_assignments ga JOIN duty_groups dg ON dg.id = ga.group_id
+      LEFT JOIN group_rules gr ON gr.group_id = ga.group_id
     WHERE ga.person_id = ${personId} AND ga.assigned_date = ${date}::date
       AND (${ownGroupId ?? null}::text IS NULL OR ga.group_id <> ${ownGroupId ?? null}::text)
   `;
-  return rows.map((row) => ({ groupId: row.groupId, groupName: row.groupName, date: assignmentDate(row.assignedDate) }));
+  return rows.map((row) => ({
+    groupId: row.groupId,
+    groupName: row.groupName,
+    date: assignmentDate(row.assignedDate),
+    kind: classifyOverlap(
+      normalizeOverlapPolicy(ownGroup?.overlapPolicy),
+      normalizeOverlapPolicy(row.overlapPolicy),
+      row.source === "manual" ? "manual" : "auto",
+    ),
+  }));
 }
 
 async function enrichDutyAssignments(rows: DbAssignment[], sql: SqlExecutor = pg()): Promise<GroupAssignment[]> {
@@ -255,23 +288,40 @@ async function enrichDutyAssignments(rows: DbAssignment[], sql: SqlExecutor = pg
       personConscriptionNumber: person?.conscriptionNumber ?? null,
       assignedDate: assignmentDate(row.assignedDate),
       source: row.source === "manual" ? "manual" : "auto",
-      conflictState: conflicts.length > 0 ? "warning" : (row.conflictState === "warning" ? "warning" : "clear"),
+      conflictState: conflicts.some((conflict) => conflict.kind === "blocking") || row.conflictState === "warning"
+        ? "warning"
+        : conflicts.length > 0 || row.conflictState === "allowed" ? "allowed" : "clear",
       conflicts,
       createdAt: row.created_at.getTime(),
     } satisfies GroupAssignment;
   }));
 }
 
-async function getAssignmentsForGroup(groupId: string, sql: SqlExecutor = pg()): Promise<GroupAssignment[]> {
-  const rows = await sql<DbAssignment[]>`
-    SELECT id, group_id AS "groupId", person_id AS "personId", assigned_date AS "assignedDate", source, conflict_state AS "conflictState", created_at
+async function getAssignmentsForGroup(groupId: string, sql: SqlExecutor = pg()): Promise<RotationAssignment[]> {
+  const rows = await sql<Array<{ id: string; personId: string; assignedDate: string | Date; source: string }>>`
+    SELECT id, person_id AS "personId", assigned_date AS "assignedDate", source
     FROM group_assignments WHERE group_id = ${groupId} ORDER BY assigned_date, created_at
   `;
-  return enrichDutyAssignments(rows, sql);
+  return rows.map((row) => ({
+    id: row.id,
+    personId: row.personId,
+    assignedDate: assignmentDate(row.assignedDate),
+    source: row.source === "manual" ? "manual" : "auto",
+  }));
 }
 
-async function getAssignmentsForGroupDate(groupId: string, date: string, sql: SqlExecutor = pg()): Promise<GroupAssignment[]> {
-  return (await getAssignmentsForGroup(groupId, sql)).filter((assignment) => assignment.assignedDate === date);
+async function getAssignmentsForGroupDate(groupId: string, date: string, sql: SqlExecutor = pg()): Promise<RotationAssignment[]> {
+  const rows = await sql<Array<{ id: string; personId: string; assignedDate: string | Date; source: string }>>`
+    SELECT id, person_id AS "personId", assigned_date AS "assignedDate", source
+    FROM group_assignments WHERE group_id = ${groupId} AND assigned_date = ${date}::date
+    ORDER BY created_at
+  `;
+  return rows.map((row) => ({
+    id: row.id,
+    personId: row.personId,
+    assignedDate: assignmentDate(row.assignedDate),
+    source: row.source === "manual" ? "manual" : "auto",
+  }));
 }
 
 async function assignedPersonIdsOnDate(date: string, ownGroupId?: string, sql: SqlExecutor = pg()): Promise<Set<string>> {
@@ -286,12 +336,37 @@ async function deleteDutyAssignments(ids: string[], sql: SqlExecutor = pg()) {
   for (const id of ids) await sql`DELETE FROM group_assignments WHERE id = ${id}`;
 }
 
+function forgetRotationAssignments(context: RotationContext | undefined, ids: ReadonlySet<string>) {
+  if (!context || ids.size === 0) return;
+  for (const [date, rows] of context.assignedByDate) {
+    context.assignedByDate.set(date, rows.filter((row) => !ids.has(row.id)));
+  }
+  for (const [groupId, rows] of context.historyByGroup) {
+    context.historyByGroup.set(groupId, rows.filter((row) => !ids.has(row.id)));
+  }
+}
+
+function rememberRotationAssignment(
+  context: RotationContext | undefined,
+  assignment: RotationAssignment & { groupId: string },
+) {
+  if (!context) return;
+  const dateRows = context.assignedByDate.get(assignment.assignedDate) ?? [];
+  dateRows.push({ id: assignment.id, groupId: assignment.groupId, personId: assignment.personId });
+  context.assignedByDate.set(assignment.assignedDate, dateRows);
+  const history = context.historyByGroup.get(assignment.groupId) ?? [];
+  history.push(assignment);
+  context.historyByGroup.set(assignment.groupId, history);
+}
+
 async function writeDutyAssignment(groupId: string, personId: string, date: string, source: "auto" | "manual", conflictState: ConflictState = "clear", sql: SqlExecutor = pg()) {
+  const id = randomUUID();
   await sql`
     INSERT INTO group_assignments (id, group_id, person_id, assigned_date, source, conflict_state)
-    VALUES (${randomUUID()}, ${groupId}, ${personId}, ${date}::date, ${source}, ${conflictState})
+    VALUES (${id}, ${groupId}, ${personId}, ${date}::date, ${source}, ${conflictState})
     ON CONFLICT (group_id, person_id, assigned_date) DO NOTHING
   `;
+  return id;
 }
 
 async function lockAssignmentDay(sql: SqlExecutor, date: string, groupId: string, personId?: string) {
@@ -300,20 +375,23 @@ async function lockAssignmentDay(sql: SqlExecutor, date: string, groupId: string
   if (personId) await sql`SELECT pg_advisory_xact_lock(hashtext(${`group-assignment-person-date:${personId}:${date}`}::text)::bigint)`;
 }
 
-async function ensureGroupAssignments(group: DutyGroup, rule: GroupRule, date: string, sql?: SqlExecutor): Promise<void> {
+async function ensureGroupAssignments(group: DutyGroup, rule: GroupRule, date: string, sql?: SqlExecutor, context?: RotationContext): Promise<void> {
   if (!sql) return inPostgresTransaction((transaction) => ensureGroupAssignments(group, rule, date, transaction));
   if (!group.enabled || !rule.activeDays.includes(dayOfWeekFromKey(date))) {
     if (!rule.autoRotate) return;
     await lockAssignmentDay(sql, date, group.id);
     const current = await getAssignmentsForGroupDate(group.id, date, sql);
     const automaticIds = current.filter((assignment) => assignment.source === "auto").map((assignment) => assignment.id);
-    if (automaticIds.length) await deleteDutyAssignments(automaticIds, sql);
+    if (automaticIds.length) {
+      await deleteDutyAssignments(automaticIds, sql);
+      forgetRotationAssignments(context, new Set(automaticIds));
+    }
     return;
   }
   if (!rule.autoRotate) return;
   await lockAssignmentDay(sql, date, group.id);
-  const exclusions = await getDutyExclusions(group.id, sql);
-  const people = await allPeopleSorted(sql);
+  const exclusions = context?.exclusionsByGroup.get(group.id) ?? await getDutyExclusions(group.id, sql);
+  const people = context?.people ?? await allPeopleSorted(sql);
   // Quotas own the platoon filter via filterPeopleByAssignmentQuotas; empty enabledPlatoons = no extra filter.
   const candidateRule = rule.assignmentQuotas.length > 0 ? { ...rule, enabledPlatoons: [] } : rule;
   const candidates = filterPeopleByAssignmentQuotas(
@@ -323,20 +401,23 @@ async function ensureGroupAssignments(group: DutyGroup, rule: GroupRule, date: s
   const eligiblePersonIds = new Set(candidates.map((person) => person.id));
   let current = await getAssignmentsForGroupDate(group.id, date, sql);
   const quotaMode = rule.assignmentQuotas.length > 0;
+  const blocked = context
+    ? new Set((context.assignedByDate.get(date) ?? []).filter((assignment) => assignment.groupId !== group.id).map((assignment) => assignment.personId))
+    : await assignedPersonIdsOnDate(date, group.id, sql);
   const staleAutoIds = [
     ...findStaleAutomaticAssignmentIds(current, eligiblePersonIds),
     ...(quotaMode ? [] : findExcessAutomaticAssignmentIds(current, rule.peoplePerDay)),
     ...current
-      .filter((assignment) => assignment.source === "auto" && assignment.conflicts.length > 0)
+      .filter((assignment) => assignment.source === "auto" && blocked.has(assignment.personId))
       .map((assignment) => assignment.id),
   ];
   const idsToDelete = [...new Set(staleAutoIds)];
   if (idsToDelete.length) {
     await deleteDutyAssignments(idsToDelete, sql);
+    forgetRotationAssignments(context, new Set(idsToDelete));
     current = current.filter((assignment) => !idsToDelete.includes(assignment.id));
   }
-  const history = await getAssignmentsForGroup(group.id, sql);
-  const blocked = await assignedPersonIdsOnDate(date, group.id, sql);
+  const history = context?.historyByGroup.get(group.id) ?? await getAssignmentsForGroup(group.id, sql);
   if (quotaMode) {
     const peopleById = new Map(people.map((person) => [person.id, person]));
     const assignedIds = new Set(current.map((assignment) => assignment.personId));
@@ -362,7 +443,8 @@ async function ensureGroupAssignments(group: DutyGroup, rule: GroupRule, date: s
       const available = selectQuotaRotationPool(candidates, quota.platoonId, assignedIds);
       const picked = pickRotationCandidates(available, history, needed, blocked, rule.priorityMode);
       for (const person of picked) {
-        await writeDutyAssignment(group.id, person.id, date, "auto", "clear", sql);
+        const id = await writeDutyAssignment(group.id, person.id, date, "auto", "clear", sql);
+        rememberRotationAssignment(context, { id, groupId: group.id, personId: person.id, assignedDate: date, source: "auto" });
         assignedIds.add(person.id);
         claimedIds.add(person.id);
       }
@@ -373,7 +455,10 @@ async function ensureGroupAssignments(group: DutyGroup, rule: GroupRule, date: s
   if (!remaining) return;
   const availableCandidates = candidates.filter((person) => !current.some((assignment) => assignment.personId === person.id));
   const picked = pickRotationCandidates(availableCandidates, history, remaining, blocked, rule.priorityMode);
-  for (const person of picked) await writeDutyAssignment(group.id, person.id, date, "auto", "clear", sql);
+  for (const person of picked) {
+    const id = await writeDutyAssignment(group.id, person.id, date, "auto", "clear", sql);
+    rememberRotationAssignment(context, { id, groupId: group.id, personId: person.id, assignedDate: date, source: "auto" });
+  }
 }
 function buildDutyGroupSnapshotFromData(
   group: DutyGroup,
@@ -459,7 +544,7 @@ export async function getPostgresGroupsSnapshot(): Promise<GroupsSnapshot> {
     sql<SnapshotRuleRow[]>`
       SELECT dg.id AS "groupId", gr.id AS "ruleId",
         gr.enabled_platoons AS "enabledPlatoons", gr.people_per_day AS "peoplePerDay", gr.assignment_quotas AS "assignmentQuotas",
-        gr.auto_rotate AS "autoRotate", gr.active_days AS "activeDays", gr.priority_mode AS "priorityMode",
+        gr.auto_rotate AS "autoRotate", gr.active_days AS "activeDays", gr.priority_mode AS "priorityMode", gr.overlap_policy AS "overlapPolicy",
         gt.default_people_per_day AS "defaultPeoplePerDay", gt.default_active_days AS "defaultActiveDays"
       FROM duty_groups dg
       JOIN group_templates gt ON gt.id = dg.template_id
@@ -479,10 +564,14 @@ export async function getPostgresGroupsSnapshot(): Promise<GroupsSnapshot> {
         p.name AS "personName", p.rank AS "personRank", p.conscription_number AS "personConscriptionNumber"
       FROM group_assignments ga
       LEFT JOIN people p ON p.id = ga.person_id
+      WHERE ga.assigned_date BETWEEN ${dates[0]}::date AND ${dates[dates.length - 1]}::date
       ORDER BY ga.group_id, ga.assigned_date, ga.created_at
     `,
   ]);
   const groupNames = new Map(groups.map((group) => [group.id, group.name]));
+  const overlapPolicies = new Map(
+    ruleRows.map((row) => [row.groupId, normalizeOverlapPolicy(row.overlapPolicy)]),
+  );
   const assignmentsByPersonDate = new Map<string, SnapshotAssignmentRow[]>();
   for (const row of assignmentRows) {
     const key = `${row.personId}\u0000${assignmentDate(row.assignedDate)}`;
@@ -499,6 +588,11 @@ export async function getPostgresGroupsSnapshot(): Promise<GroupsSnapshot> {
         groupId: other.groupId,
         groupName: groupNames.get(other.groupId) ?? other.groupId,
         date: assignmentDate(other.assignedDate),
+        kind: classifyOverlap(
+          overlapPolicies.get(row.groupId) ?? "exclusive",
+          overlapPolicies.get(other.groupId) ?? "exclusive",
+          other.source === "manual" ? "manual" : "auto",
+        ),
       }));
     const assignment: GroupAssignment = {
       id: row.id,
@@ -509,7 +603,9 @@ export async function getPostgresGroupsSnapshot(): Promise<GroupsSnapshot> {
       personConscriptionNumber: row.personConscriptionNumber,
       assignedDate: assignmentDate(row.assignedDate),
       source: row.source === "manual" ? "manual" : "auto",
-      conflictState: conflicts.length > 0 || row.conflictState === "warning" ? "warning" : "clear",
+      conflictState: conflicts.some((conflict) => conflict.kind === "blocking") || row.conflictState === "warning"
+        ? "warning"
+        : conflicts.length > 0 || row.conflictState === "allowed" ? "allowed" : "clear",
       conflicts,
       createdAt: row.created_at.getTime(),
     };
@@ -529,6 +625,7 @@ export async function getPostgresGroupsSnapshot(): Promise<GroupsSnapshot> {
           autoRotate: row.autoRotate ?? true,
           activeDays: row.activeDays,
           priorityMode: row.priorityMode,
+          overlapPolicy: row.overlapPolicy,
         })
       : {
           id: randomUUID(),
@@ -539,6 +636,7 @@ export async function getPostgresGroupsSnapshot(): Promise<GroupsSnapshot> {
           autoRotate: true,
           activeDays: normalizeActiveDays(row.defaultActiveDays),
           priorityMode: "oldest",
+          overlapPolicy: "exclusive",
         });
   }
   const exclusionsByGroup = new Map<string, GroupExclusion[]>();
@@ -566,14 +664,44 @@ export async function getPostgresGroupsSnapshot(): Promise<GroupsSnapshot> {
 }
 
 /** Explicit scheduler/action entry point. Snapshot reads never write assignments. */
-export async function refreshPostgresAutomaticDutyAssignments(days = 7): Promise<GroupsSnapshot> {
-  const dates = weekDates(new Date(), days);
+export async function materializePostgresAutomaticDutyAssignments(
+  from: string,
+  to: string,
+  selectedGroupIds?: string[],
+): Promise<void> {
+  const dates = scheduleDateRange(from, to);
+  if (!dates) throw new Error("BAD_REQUEST");
+  const selected = selectedGroupIds?.length ? new Set(selectedGroupIds) : null;
   await inPostgresTransaction(async (transaction) => {
-    for (const group of await getDutyGroups(transaction)) {
+    const groups = await getDutyGroups(transaction);
+    const context: RotationContext = {
+      people: await allPeopleSorted(transaction),
+      exclusionsByGroup: new Map(),
+      historyByGroup: new Map(),
+      assignedByDate: new Map(),
+    };
+    const existingRows = await transaction<Array<{ id: string; groupId: string; personId: string; assignedDate: string | Date }>>`
+      SELECT id, group_id AS "groupId", person_id AS "personId", assigned_date AS "assignedDate"
+      FROM group_assignments
+      WHERE assigned_date BETWEEN ${dates[0]}::date AND ${dates[dates.length - 1]}::date
+    `;
+    for (const row of existingRows) {
+      const dateRows = context.assignedByDate.get(assignmentDate(row.assignedDate)) ?? [];
+      dateRows.push({ id: row.id, groupId: row.groupId, personId: row.personId });
+      context.assignedByDate.set(assignmentDate(row.assignedDate), dateRows);
+    }
+    for (const group of groups.filter((item) => !selected || selected.has(item.id))) {
       const rule = await getDutyRule(group.id, transaction);
-      for (const date of dates) await ensureGroupAssignments(group, rule, date, transaction);
+      context.exclusionsByGroup.set(group.id, await getDutyExclusions(group.id, transaction));
+      context.historyByGroup.set(group.id, await getAssignmentsForGroup(group.id, transaction));
+      for (const date of dates) await ensureGroupAssignments(group, rule, date, transaction, context);
     }
   });
+}
+
+export async function refreshPostgresAutomaticDutyAssignments(days = 7): Promise<GroupsSnapshot> {
+  const dates = weekDates(new Date(), days);
+  await materializePostgresAutomaticDutyAssignments(dates[0], dates[dates.length - 1]);
   return getPostgresGroupsSnapshot();
 }
 
@@ -587,7 +715,7 @@ export async function createPostgresDutyGroup(input: GroupCreateInput): Promise<
   const now = Date.now();
   await inPostgresTransaction(async (transaction) => {
     await transaction`INSERT INTO duty_groups (id, template_id, name, notes, enabled, sort_order) VALUES (${groupId}, ${input.templateId}, ${input.name.trim()}, ${input.notes?.trim() ?? ""}, true, ${now})`;
-    await transaction`INSERT INTO group_rules (id, group_id, enabled_platoons, people_per_day, assignment_quotas, auto_rotate, active_days, priority_mode) VALUES (${randomUUID()}, ${groupId}, ${transaction.json([])}::jsonb, ${template.defaultPeoplePerDay}, ${transaction.json([])}::jsonb, true, ${transaction.json(normalizeActiveDays(template.defaultActiveDays))}::jsonb, 'oldest')`;
+    await transaction`INSERT INTO group_rules (id, group_id, enabled_platoons, people_per_day, assignment_quotas, auto_rotate, active_days, priority_mode, overlap_policy) VALUES (${randomUUID()}, ${groupId}, ${transaction.json([])}::jsonb, ${template.defaultPeoplePerDay}, ${transaction.json([])}::jsonb, true, ${transaction.json(normalizeActiveDays(template.defaultActiveDays))}::jsonb, 'oldest', 'exclusive')`;
   });
   return refreshPostgresAutomaticDutyAssignments();
 }
@@ -624,55 +752,88 @@ export async function deletePostgresDutyGroup(id: string): Promise<GroupsSnapsho
 }
 
 export async function updatePostgresDutyGroupRule(input: RuleUpdateInput): Promise<GroupsSnapshot> {
-  const sql = pg();
-  const [group] = await sql<Array<{ updatedAt: Date }>>`
-    SELECT updated_at AS "updatedAt" FROM duty_groups WHERE id = ${input.groupId}
-  `;
-  if (!group) throw new Error("GROUP_NOT_FOUND");
-  if (
-    input.expectedUpdatedAt !== undefined &&
-    Math.floor(group.updatedAt.getTime()) !== input.expectedUpdatedAt
-  ) {
-    throw new Error("GROUP_STALE_WRITE");
-  }
-  const current = await getDutyRule(input.groupId, sql);
-  const existing = await sql`SELECT 1 FROM group_rules WHERE group_id = ${input.groupId}`;
-  if (!existing.length) {
-    await sql`
-      INSERT INTO group_rules (id, group_id, enabled_platoons, people_per_day, assignment_quotas, auto_rotate, active_days, priority_mode)
-      VALUES (${current.id}, ${current.groupId}, ${sql.json(current.enabledPlatoons)}::jsonb, ${current.peoplePerDay}, ${sql.json(current.assignmentQuotas)}::jsonb, ${current.autoRotate}, ${sql.json(current.activeDays)}::jsonb, ${current.priorityMode})
-      ON CONFLICT (group_id) DO NOTHING
+  await inPostgresTransaction(async (sql) => {
+    const [group] = await sql<Array<{ updatedAt: Date }>>`
+      SELECT updated_at AS "updatedAt" FROM duty_groups WHERE id = ${input.groupId} FOR UPDATE
     `;
-  }
-  const assignmentQuotas = normalizeAssignmentQuotas(input.assignmentQuotas ?? current.assignmentQuotas);
-  const rule = {
-    assignmentQuotas,
-    // Empty assignmentQuotas must not wipe enabledPlatoons — only non-empty quotas derive the filter.
-    enabledPlatoons: resolveRuleEnabledPlatoons(
-      assignmentQuotas,
-      input.enabledPlatoons,
-      current.enabledPlatoons,
-    ),
-    peoplePerDay: assignmentQuotas.length > 0 ? quotaTotal(assignmentQuotas) : input.peoplePerDay ?? current.peoplePerDay,
-    autoRotate: input.autoRotate ?? current.autoRotate,
-    activeDays: normalizeActiveDays(input.activeDays ?? current.activeDays),
-    priorityMode: normalizePriorityMode(input.priorityMode ?? current.priorityMode),
-  };
-  if (!Number.isInteger(rule.peoplePerDay) || rule.peoplePerDay < 1) throw new Error("PEOPLE_PER_DAY_INVALID");
-  await sql`
-    UPDATE group_rules SET enabled_platoons = ${sql.json(rule.enabledPlatoons)}::jsonb, people_per_day = ${rule.peoplePerDay},
-      auto_rotate = ${rule.autoRotate}, assignment_quotas = ${sql.json(rule.assignmentQuotas)}::jsonb, active_days = ${sql.json(rule.activeDays)}::jsonb, priority_mode = ${rule.priorityMode}
-    WHERE group_id = ${input.groupId}
-  `;
-  const touched = input.expectedUpdatedAt === undefined
-    ? await sql`UPDATE duty_groups SET updated_at = now() WHERE id = ${input.groupId} RETURNING id`
-    : await sql`
-        UPDATE duty_groups SET updated_at = now()
-        WHERE id = ${input.groupId}
-          AND FLOOR(EXTRACT(EPOCH FROM updated_at) * 1000) = ${input.expectedUpdatedAt}
-        RETURNING id
+    if (!group) throw new Error("GROUP_NOT_FOUND");
+    if (
+      input.expectedUpdatedAt !== undefined &&
+      Math.floor(group.updatedAt.getTime()) !== input.expectedUpdatedAt
+    ) {
+      throw new Error("GROUP_STALE_WRITE");
+    }
+    const current = await getDutyRule(input.groupId, sql);
+    const overlapPolicy = normalizeOverlapPolicy(input.overlapPolicy ?? current.overlapPolicy);
+    const cleanupRows = current.overlapPolicy === "manual" && overlapPolicy === "exclusive"
+      ? await sql<Array<{ id: string; groupId: string; groupName: string; assignedDate: string | Date }>>`
+          SELECT other.id, other.group_id AS "groupId", dg.name AS "groupName", other.assigned_date AS "assignedDate"
+          FROM group_assignments own
+          JOIN group_assignments other
+            ON other.person_id = own.person_id
+           AND other.assigned_date = own.assigned_date
+           AND other.group_id <> own.group_id
+          JOIN duty_groups dg ON dg.id = other.group_id
+          WHERE own.group_id = ${input.groupId}
+        `
+      : [];
+    if (cleanupRows.length && !input.confirmOverlapCleanup) {
+      const error = new Error("GROUP_OVERLAP_CLEANUP_REQUIRED") as Error & {
+        cleanupCount?: number;
+        conflicts?: GroupConflict[];
+      };
+      error.cleanupCount = cleanupRows.length;
+      error.conflicts = cleanupRows.map((row) => ({
+        groupId: row.groupId,
+        groupName: row.groupName,
+        date: assignmentDate(row.assignedDate),
+        kind: "blocking",
+      }));
+      throw error;
+    }
+    const existing = await sql`SELECT 1 FROM group_rules WHERE group_id = ${input.groupId}`;
+    if (!existing.length) {
+      await sql`
+        INSERT INTO group_rules (id, group_id, enabled_platoons, people_per_day, assignment_quotas, auto_rotate, active_days, priority_mode, overlap_policy)
+        VALUES (${current.id}, ${current.groupId}, ${sql.json(current.enabledPlatoons)}::jsonb, ${current.peoplePerDay}, ${sql.json(current.assignmentQuotas)}::jsonb, ${current.autoRotate}, ${sql.json(current.activeDays)}::jsonb, ${current.priorityMode}, ${current.overlapPolicy})
+        ON CONFLICT (group_id) DO NOTHING
       `;
-  if (!touched.length) throw new Error("GROUP_STALE_WRITE");
+    }
+    const assignmentQuotas = normalizeAssignmentQuotas(input.assignmentQuotas ?? current.assignmentQuotas);
+    const rule = {
+      assignmentQuotas,
+      // Empty assignmentQuotas must not wipe enabledPlatoons — only non-empty quotas derive the filter.
+      enabledPlatoons: resolveRuleEnabledPlatoons(
+        assignmentQuotas,
+        input.enabledPlatoons,
+        current.enabledPlatoons,
+      ),
+      peoplePerDay: assignmentQuotas.length > 0 ? quotaTotal(assignmentQuotas) : input.peoplePerDay ?? current.peoplePerDay,
+      autoRotate: input.autoRotate ?? current.autoRotate,
+      activeDays: normalizeActiveDays(input.activeDays ?? current.activeDays),
+      priorityMode: normalizePriorityMode(input.priorityMode ?? current.priorityMode),
+      overlapPolicy,
+    };
+    if (!Number.isInteger(rule.peoplePerDay) || rule.peoplePerDay < 1) throw new Error("PEOPLE_PER_DAY_INVALID");
+    await sql`
+      UPDATE group_rules SET enabled_platoons = ${sql.json(rule.enabledPlatoons)}::jsonb, people_per_day = ${rule.peoplePerDay},
+        auto_rotate = ${rule.autoRotate}, assignment_quotas = ${sql.json(rule.assignmentQuotas)}::jsonb, active_days = ${sql.json(rule.activeDays)}::jsonb,
+        priority_mode = ${rule.priorityMode}, overlap_policy = ${rule.overlapPolicy}
+      WHERE group_id = ${input.groupId}
+    `;
+    if (cleanupRows.length) {
+      await sql`DELETE FROM group_assignments WHERE id = ANY(${sql.array(cleanupRows.map((row) => row.id))})`;
+    }
+    const touched = input.expectedUpdatedAt === undefined
+      ? await sql`UPDATE duty_groups SET updated_at = now() WHERE id = ${input.groupId} RETURNING id`
+      : await sql`
+          UPDATE duty_groups SET updated_at = now()
+          WHERE id = ${input.groupId}
+            AND FLOOR(EXTRACT(EPOCH FROM updated_at) * 1000) = ${input.expectedUpdatedAt}
+          RETURNING id
+        `;
+    if (!touched.length) throw new Error("GROUP_STALE_WRITE");
+  });
   return refreshPostgresAutomaticDutyAssignments();
 }
 
@@ -687,49 +848,105 @@ export async function rotatePostgresDutyGroup(groupId: string, date = localDateK
   return getPostgresGroupsSnapshot();
 }
 
-export async function assignPostgresPersonToDutyGroup(groupId: string, personId: string, date = localDateKey(), allowConflict = false): Promise<GroupsSnapshot> {
-  await inPostgresTransaction(async (transaction) => {
-    await lockAssignmentDay(transaction, date, groupId, personId);
-    const [group] = await transaction<Array<{ enabled: boolean }>>`SELECT enabled FROM duty_groups WHERE id = ${groupId} FOR UPDATE`;
-    const [person] = await transaction<Array<{ platoonId: string }>>`SELECT platoon_id AS "platoonId" FROM people WHERE id = ${personId} FOR SHARE`;
-    if (!group) throw new Error("GROUP_NOT_FOUND");
-    if (!person) throw new Error("PERSON_NOT_FOUND");
-    const rule = await getDutyRule(groupId, transaction);
-    const dayOfWeek = dayOfWeekFromKey(date);
-    const excluded = (await transaction`SELECT 1 FROM group_exclusions WHERE group_id = ${groupId} AND person_id = ${personId} AND (day_of_week IS NULL OR day_of_week = ${dayOfWeek}) LIMIT 1`).length > 0;
-    // Quotas and enabledPlatoons share one filter: wrong platoon → platoon_disabled, not OVERFILLED.
-    const reason = groupAssignmentIneligibility({
-      groupEnabled: group.enabled,
-      activeDays: rule.activeDays,
-      dayOfWeek,
-      enabledPlatoons: rulePlatoonFilter(rule),
-      personPlatoonId: person.platoonId,
-      excluded,
-    });
-    if (reason) throw new GroupAssignmentIneligibleError(reason);
-    const current = await getAssignmentsForGroupDate(groupId, date, transaction);
-    if (!current.some((assignment) => assignment.personId === personId)) {
-      if (rule.assignmentQuotas.length > 0) {
-        const people = await allPeopleSorted(transaction);
-        const peopleById = new Map(people.map((person) => [person.id, person]));
-        const counts = quotaAssignmentCounts(rule.assignmentQuotas, current, peopleById);
-        const quotaIndex = rule.assignmentQuotas.findIndex((quota) => quota.platoonId === person.platoonId);
-        if (quotaIndex < 0 || counts[quotaIndex] >= rule.assignmentQuotas[quotaIndex].count) {
-          throw new Error("GROUP_ASSIGNMENT_OVERFILLED");
-        }
-      } else if (current.length >= rule.peoplePerDay) {
-        throw new Error("GROUP_ASSIGNMENT_OVERFILLED");
-      }
+type AssignmentDateResult =
+  | { assigned: true }
+  | { assigned: false; skipped: GroupAssignmentRangeSkip };
+
+async function assignPersonOnDate(
+  groupId: string,
+  personId: string,
+  date: string,
+  transaction: SqlExecutor,
+  options: { skipInvalid: boolean },
+): Promise<AssignmentDateResult> {
+  const [group] = await transaction<Array<{ enabled: boolean }>>`SELECT enabled FROM duty_groups WHERE id = ${groupId} FOR UPDATE`;
+  const [person] = await transaction<Array<{ platoonId: string }>>`SELECT platoon_id AS "platoonId" FROM people WHERE id = ${personId} FOR SHARE`;
+  if (!group) throw new Error("GROUP_NOT_FOUND");
+  if (!person) throw new Error("PERSON_NOT_FOUND");
+  const rule = await getDutyRule(groupId, transaction);
+  const dayOfWeek = dayOfWeekFromKey(date);
+  const excluded = (await transaction`SELECT 1 FROM group_exclusions WHERE group_id = ${groupId} AND person_id = ${personId} AND (day_of_week IS NULL OR day_of_week = ${dayOfWeek}) LIMIT 1`).length > 0;
+  // Quotas and enabledPlatoons share one filter: wrong platoon → platoon_disabled, not OVERFILLED.
+  const reason = groupAssignmentIneligibility({
+    groupEnabled: group.enabled,
+    activeDays: rule.activeDays,
+    dayOfWeek,
+    enabledPlatoons: rulePlatoonFilter(rule),
+    personPlatoonId: person.platoonId,
+    excluded,
+  });
+  if (reason) {
+    if (!options.skipInvalid) throw new GroupAssignmentIneligibleError(reason);
+    return { assigned: false, skipped: { date, reason, conflicts: [] } };
+  }
+
+  const current = await getAssignmentsForGroupDate(groupId, date, transaction);
+  if (current.some((assignment) => assignment.personId === personId)) {
+    if (!options.skipInvalid) return { assigned: false, skipped: { date, reason: "already_assigned", conflicts: [] } };
+    return { assigned: false, skipped: { date, reason: "already_assigned", conflicts: [] } };
+  }
+  if (rule.assignmentQuotas.length > 0) {
+    const people = await allPeopleSorted(transaction);
+    const peopleById = new Map(people.map((person) => [person.id, person]));
+    const counts = quotaAssignmentCounts(rule.assignmentQuotas, current, peopleById);
+    const quotaIndex = rule.assignmentQuotas.findIndex((quota) => quota.platoonId === person.platoonId);
+    if (quotaIndex < 0 || counts[quotaIndex] >= rule.assignmentQuotas[quotaIndex].count) {
+      if (!options.skipInvalid) throw new Error("GROUP_ASSIGNMENT_OVERFILLED");
+      return { assigned: false, skipped: { date, reason: "overfilled", conflicts: [] } };
     }
-    const conflicts = await conflictRows(personId, date, groupId, transaction);
-    if (conflicts.length && !allowConflict) {
+  } else if (current.length >= rule.peoplePerDay) {
+    if (!options.skipInvalid) throw new Error("GROUP_ASSIGNMENT_OVERFILLED");
+    return { assigned: false, skipped: { date, reason: "overfilled", conflicts: [] } };
+  }
+
+  const conflicts = await conflictRows(personId, date, groupId, transaction);
+  const blockingConflicts = conflicts.filter((conflict) => conflict.kind === "blocking");
+  if (blockingConflicts.length) {
+    if (!options.skipInvalid) {
       const error = new Error("GROUP_ASSIGNMENT_CONFLICT") as Error & { conflicts?: GroupConflict[] };
-      error.conflicts = conflicts;
+      error.conflicts = blockingConflicts;
       throw error;
     }
-    await writeDutyAssignment(groupId, personId, date, "manual", conflicts.length ? "warning" : "clear", transaction);
+    return { assigned: false, skipped: { date, reason: "conflict", conflicts: blockingConflicts } };
+  }
+
+  await writeDutyAssignment(groupId, personId, date, "manual", conflicts.length ? "allowed" : "clear", transaction);
+  return { assigned: true };
+}
+
+export async function assignPostgresPersonToDutyGroup(groupId: string, personId: string, date = localDateKey()): Promise<GroupsSnapshot> {
+  await inPostgresTransaction(async (transaction) => {
+    await lockAssignmentDay(transaction, date, groupId, personId);
+    await assignPersonOnDate(groupId, personId, date, transaction, { skipInvalid: false });
   });
   return getPostgresGroupsSnapshot();
+}
+
+export async function assignPostgresPersonToDutyGroupRange(
+  groupId: string,
+  personId: string,
+  from: string,
+  to: string,
+): Promise<GroupAssignmentRangeResult> {
+  const dates = scheduleDateRange(from, to);
+  if (!dates) throw new Error("BAD_REQUEST");
+  const result = await inPostgresTransaction(async (transaction) => {
+    const assignedDates: string[] = [];
+    const skippedDates: GroupAssignmentRangeSkip[] = [];
+    for (const date of dates) {
+      await lockAssignmentDay(transaction, date, groupId, personId);
+      const dateResult = await assignPersonOnDate(groupId, personId, date, transaction, { skipInvalid: true });
+      if (dateResult.assigned) assignedDates.push(date);
+      else skippedDates.push(dateResult.skipped);
+    }
+    return { assignedDates, skippedDates };
+  });
+  return {
+    ...result,
+    from,
+    to,
+    snapshot: await getPostgresGroupsSnapshot(),
+  };
 }
 
 export async function removePostgresDutyAssignment(assignmentId: string): Promise<GroupsSnapshot> {

@@ -25,5 +25,19 @@ describe("schedule UI integration contract", () => {
     expect(schedule).toContain("assignment.conflictState === \"warning\"");
     expect(route).toContain('requireAnyPermission(request, ["roster:read", "groups:read"])');
     expect(route).toContain("scheduleDateRange(from, to)");
+    expect(schedule).not.toContain("Сформировать автоматически");
+    expect(schedule).toContain("Обзор периода");
+    expect(schedule).toContain("Назначить вручную");
+    expect(schedule).toContain("assignSchedulePerson(editorGroupId, selectedPerson.id, cellTarget.date)");
+    expect(schedule).toContain("role={canWrite ? \"button\" : undefined}");
+    expect(schedule).toContain("Открыть редактор назначений");
+  });
+
+  it("exposes the explicit generation endpoint and group workspace entry", () => {
+    const generateRoute = read("src/app/api/schedule/generate/route.ts");
+    const workspace = read("src/features/WorkspaceApp.tsx");
+    expect(generateRoute).toContain('"groups.schedule.generated"');
+    expect(generateRoute).toContain("materializePostgresAutomaticDutyAssignments");
+    expect(workspace).toContain("График");
   });
 });

@@ -3,6 +3,7 @@ import type { Person } from "@/features/roster/types";
 import type { GroupAssignment, GroupExclusion } from "@/features/groups/types";
 import {
   dayOfWeekFromKey,
+  classifyOverlap,
   filterCandidates,
   findExcessAutomaticAssignmentIds,
   filterPeopleByAssignmentQuotas,
@@ -52,6 +53,13 @@ function assignment(
 }
 
 describe("group candidate filters", () => {
+  it("allows only manual overlap when both groups explicitly allow it", () => {
+    expect(classifyOverlap("manual", "manual", "manual")).toBe("allowed");
+    expect(classifyOverlap("manual", "exclusive", "manual")).toBe("blocking");
+    expect(classifyOverlap("manual", "manual", "auto")).toBe("blocking");
+    expect(classifyOverlap("exclusive", "manual", "manual")).toBe("blocking");
+  });
+
   it("uses platoon filters and day exclusions together", () => {
     const exclusions: Pick<GroupExclusion, "personId" | "dayOfWeek">[] = [
       { personId: "p2", dayOfWeek: dayOfWeekFromKey("2026-07-06") },

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { GearSixIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { SelectField } from "@/components/select-field";
 import type { Platoon } from "../../roster/types";
-import type { DutyGroupSnapshot, GroupAssignmentQuota, GroupPriorityMode } from "../types";
+import type { DutyGroupSnapshot, GroupAssignmentQuota, GroupPriorityMode, GroupOverlapPolicy, RuleUpdateInput } from "../types";
 import { DAY_NAMES, DAY_SHORT_NAMES } from "../utils";
 import { CollapsibleSection } from "./collapsible-section";
 import { GROUP_NAME_MAX_LENGTH, GROUP_NOTES_MAX_LENGTH } from "./constants";
@@ -22,14 +22,7 @@ export function SettingsPanel({
   item: DutyGroupSnapshot;
   platoons: Platoon[];
   isBusy: boolean;
-  onSave: (payload: {
-    enabledPlatoons: string[];
-    peoplePerDay: number;
-    assignmentQuotas: GroupAssignmentQuota[];
-    autoRotate: boolean;
-    activeDays: number[];
-    priorityMode: GroupPriorityMode;
-  }) => Promise<unknown>;
+  onSave: (payload: Omit<RuleUpdateInput, "groupId" | "expectedUpdatedAt">) => Promise<unknown>;
   onRename: (payload: { name: string; notes: string }) => Promise<unknown>;
   onDelete: () => void;
 }) {
@@ -43,6 +36,9 @@ export function SettingsPanel({
   const [activeDays, setActiveDays] = useState(item.rule.activeDays);
   const [priorityMode, setPriorityMode] = useState<GroupPriorityMode>(
     item.rule.priorityMode,
+  );
+  const [overlapPolicy, setOverlapPolicy] = useState<GroupOverlapPolicy>(
+    item.rule.overlapPolicy,
   );
 
   const togglePlatoon = (id: string) =>
@@ -162,6 +158,16 @@ export function SettingsPanel({
           label="Автоматически заполнять дни"
           onChange={setAutoRotate}
         />
+        <div className="grid min-w-0 gap-1">
+          <StyledCheckbox
+            checked={overlapPolicy === "manual"}
+            label="Разрешать ручное совмещение"
+            onChange={(checked) => setOverlapPolicy(checked ? "manual" : "exclusive")}
+          />
+          <small className="pl-7 text-[11px] text-text-muted">
+            Совмещение с другой группой возможно только вручную и только если обе группы его разрешают.
+          </small>
+        </div>
         <div className="grid min-w-0 gap-1.75">
           <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-extrabold text-text-secondary">
             Кого назначать автоматически
@@ -316,6 +322,7 @@ export function SettingsPanel({
               autoRotate,
               activeDays,
               priorityMode,
+              overlapPolicy,
             })
           }
         >

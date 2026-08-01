@@ -27,6 +27,7 @@ export type DutyGroup = {
 
 export type GroupPriorityMode = "oldest" | "random";
 export type GroupAssignmentQuota = { platoonId: string; count: number };
+export type GroupOverlapPolicy = "exclusive" | "manual";
 
 export type GroupRule = {
   id: string;
@@ -37,15 +38,18 @@ export type GroupRule = {
   autoRotate: boolean;
   activeDays: number[];
   priorityMode: GroupPriorityMode;
+  overlapPolicy: GroupOverlapPolicy;
 };
 
 export type AssignmentSource = "auto" | "manual";
-export type ConflictState = "clear" | "warning";
+export type ConflictState = "clear" | "warning" | "allowed";
+export type ConflictKind = "blocking" | "allowed";
 
 export type GroupConflict = {
   groupId: string;
   groupName: string;
   date: string;
+  kind: ConflictKind;
 };
 
 export type GroupAssignment = {
@@ -60,6 +64,20 @@ export type GroupAssignment = {
   conflictState: ConflictState;
   conflicts: GroupConflict[];
   createdAt: number;
+};
+
+export type GroupAssignmentRangeSkip = {
+  date: string;
+  reason: "inactive_day" | "excluded" | "platoon_disabled" | "group_disabled" | "overfilled" | "already_assigned" | "conflict";
+  conflicts: GroupConflict[];
+};
+
+export type GroupAssignmentRangeResult = {
+  snapshot: GroupsSnapshot;
+  from: string;
+  to: string;
+  assignedDates: string[];
+  skippedDates: GroupAssignmentRangeSkip[];
 };
 
 export type GroupExclusion = {
@@ -134,4 +152,6 @@ export type RuleUpdateInput = {
   autoRotate?: boolean;
   activeDays?: number[];
   priorityMode?: GroupPriorityMode;
+  overlapPolicy?: GroupOverlapPolicy;
+  confirmOverlapCleanup?: boolean;
 };
