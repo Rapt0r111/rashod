@@ -9,6 +9,7 @@ import {
   scheduleMonthLabel,
   scheduleDateRange,
   scheduleDateLabel,
+  scheduleAssignmentState,
 } from "@/features/schedule/logic";
 import type { ScheduleSnapshot } from "@/features/schedule/types";
 
@@ -83,6 +84,19 @@ describe("schedule logic", () => {
     expect(compactDutyLabel("Дежурный по роте")).toBe("ДПР");
     expect(assignmentsForCell(snapshot.assignments, "person-1", "2026-07-27")).toHaveLength(1);
     expect(assignmentsForCell(snapshot.assignments, "person-1", "2026-07-28")).toHaveLength(0);
+  });
+
+  it("prioritizes schedule assignment states for the selected person and date", () => {
+    const assignment = (conflictState: "clear" | "allowed" | "warning") => ({
+      ...snapshot.assignments[0],
+      id: `assignment-${conflictState}`,
+      conflictState,
+    });
+
+    expect(scheduleAssignmentState([])).toBe("empty");
+    expect(scheduleAssignmentState([assignment("clear")])).toBe("clear");
+    expect(scheduleAssignmentState([assignment("allowed")])).toBe("allowed");
+    expect(scheduleAssignmentState([assignment("allowed"), assignment("warning")])).toBe("warning");
   });
 
   it("exports a spreadsheet-safe UTF-8 schedule", () => {

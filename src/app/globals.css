@@ -222,6 +222,13 @@
 .schedule-table .schedule-sticky {
   position: sticky;
   z-index: 2;
+  /* Sticky cells must be opaque, otherwise scrolled date cells show through. */
+  background-color: color-mix(in oklch, var(--bg-panel) 88%, var(--bg-base));
+}
+
+.schedule-table thead .schedule-sticky {
+  z-index: 3;
+  background-color: color-mix(in oklch, var(--bg-raised) 92%, var(--bg-base));
 }
 
 .schedule-table .schedule-number-cell {

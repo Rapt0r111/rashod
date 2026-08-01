@@ -29,8 +29,27 @@ describe("schedule UI integration contract", () => {
     expect(schedule).toContain("Обзор периода");
     expect(schedule).toContain("Назначить вручную");
     expect(schedule).toContain("assignSchedulePerson(editorGroupId, selectedPerson.id, cellTarget.date)");
+    expect(schedule).toContain('useRealtimeDomain(["groups", "roster", "unknown"]');
+    expect(schedule).toContain("await loadSnapshot(snapshot.from, snapshot.to)");
     expect(schedule).toContain("role={canWrite ? \"button\" : undefined}");
     expect(schedule).toContain("Открыть редактор назначений");
+    expect(schedule).toContain("Рабочий состав");
+    expect(schedule).toContain("Фильтр по подразделению");
+    expect(schedule).toContain("Фильтр по группе");
+    expect(schedule).toContain('groupFilter !== "all"');
+    expect(schedule).toContain("Фильтр по статусу назначения");
+    expect(schedule).toContain("Быстрые диапазоны загружаются сразу");
+    expect(schedule).toContain("Вертикальный график");
+    expect(schedule).toContain("max-[480px]:grid");
+    expect(schedule).toContain('role="dialog"');
+    expect(read("src/app/globals.css")).toContain(".schedule-table thead .schedule-sticky");
+    expect(schedule).toContain('aria-modal="true"');
+    expect(schedule).toContain('event.key === "Escape"');
+    expect(schedule).toContain("scheduleAssignmentState(selectedAssignments)");
+    expect(schedule).toContain("Совмещение разрешено");
+    expect(schedule).toContain("Нет назначений");
+    expect(schedule).not.toContain("function AssignmentHint");
+    expect(schedule).not.toContain("schedule-assignment-hint");
   });
 
   it("exposes the explicit generation endpoint and group workspace entry", () => {

@@ -104,6 +104,17 @@ export function assignmentsForCell(
   );
 }
 
+export type ScheduleAssignmentState = "empty" | "clear" | "allowed" | "warning";
+
+export function scheduleAssignmentState(
+  assignments: readonly GroupAssignment[],
+): ScheduleAssignmentState {
+  if (!assignments.length) return "empty";
+  if (assignments.some((assignment) => assignment.conflictState === "warning")) return "warning";
+  if (assignments.some((assignment) => assignment.conflictState === "allowed")) return "allowed";
+  return "clear";
+}
+
 export function groupById(groups: readonly DutyGroup[]) {
   return new Map(groups.map((group) => [group.id, group]));
 }
