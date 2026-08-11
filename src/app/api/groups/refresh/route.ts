@@ -4,8 +4,8 @@ import { requirePermission } from "@/server/auth";
 import { refreshPostgresAutomaticDutyAssignments as refreshAutomaticDutyAssignments } from "@/server/db/postgres-groups-repository";
 import { publishRosterChanged } from "@/server/events";
 import { apiError, parseJson, runAuditedMutation } from "@/server/http";
+import { liveJson } from "@/server/cache/http";
 
-export const dynamic = "force-dynamic";
 
 const schema = z.object({ days: z.number().int().min(1).max(31).optional() });
 
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
       { days: input.days ?? null },
     );
     publishRosterChanged("groups-refresh");
-    return NextResponse.json(snapshot, { headers: { "Cache-Control": "no-store" } });
+    return liveJson(snapshot);
   } catch (error) {
     return apiError(error);
   }

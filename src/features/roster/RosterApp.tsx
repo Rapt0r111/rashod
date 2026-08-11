@@ -49,17 +49,19 @@ import type { ScheduleSnapshot } from "../schedule/types";
 import { hasPermission, type Permission } from "@/features/auth/permissions";
 import { Loader } from "@/components/loader";
 
+// Chunk loading UI is handled by SectionLoading while snapshot fetches —
+// avoid a second full-section spinner from next/dynamic.
 const GroupsApp = dynamic(
   () => import("../groups/GroupsApp").then((module) => module.GroupsApp),
-  { loading: () => <SectionLoading /> },
+  { loading: () => null },
 );
 const TasksApp = dynamic(
   () => import("../tasks/TasksApp").then((module) => module.TasksApp),
-  { loading: () => <SectionLoading /> },
+  { loading: () => null },
 );
 const ScheduleApp = dynamic(
   () => import("../schedule/ScheduleApp").then((module) => module.ScheduleApp),
-  { loading: () => <SectionLoading /> },
+  { loading: () => null },
 );
 const AdminPanel = dynamic(
   () => import("./components/admin-panel").then((module) => module.AdminPanel),

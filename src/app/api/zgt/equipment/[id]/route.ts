@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "@/server/auth";
 import { getEquipmentById } from "@/server/db/postgres-zgt-repository";
 import { apiError } from "@/server/http";
+import { liveJson } from "@/server/cache/http";
 
-export const dynamic = "force-dynamic";
 
 export async function GET(
   request: Request,
@@ -15,8 +15,8 @@ export async function GET(
   try {
     const { id } = await context.params;
     const item = await getEquipmentById(id);
-    if (!item) return NextResponse.json({ error: "EQUIPMENT_NOT_FOUND" }, { status: 404 });
-    return NextResponse.json({ item }, { headers: { "Cache-Control": "no-store" } });
+    if (!item) return liveJson({ error: "EQUIPMENT_NOT_FOUND" }, { status: 404 });
+    return NextResponse.json({ item });
   } catch (error) {
     return apiError(error);
   }

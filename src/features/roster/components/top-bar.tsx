@@ -26,7 +26,11 @@ export function TopBar(props: {
   canAccessZgt?: boolean;
   onLogout: () => void;
   onToggleFullscreen: () => void;
+  /** When true, module switcher + logout live in the shared portal shell. */
+  embeddedInShell?: boolean;
 }) {
+  const embedded = Boolean(props.embeddedInShell);
+
   return (
     <header className="flex h-16 min-w-0 items-center gap-3 border-b border-line bg-[oklch(15%_0.04_286)] px-4.5 max-[1180px]:gap-2.5 max-[1180px]:px-3.5 max-[900px]:h-16 max-[900px]:min-h-16 max-[900px]:gap-2.5 max-[900px]:px-3.5 max-[560px]:gap-2 max-[560px]:px-2.5">
       <div
@@ -40,7 +44,6 @@ export function TopBar(props: {
           <div className="overflow-hidden text-ellipsis whitespace-nowrap font-bold">
             Расход л/с
           </div>
-          {/* Added suppressHydrationWarning here as well in case the date shifts */}
           <div
             className="overflow-hidden text-ellipsis whitespace-nowrap text-xs text-text-muted max-[900px]:hidden"
             suppressHydrationWarning
@@ -49,27 +52,31 @@ export function TopBar(props: {
           </div>
         </div>
       </div>
-      <nav
-        className="flex min-w-0 items-center gap-1.5 max-[720px]:hidden"
-        aria-label="Рабочие модули"
-      >
-        {props.canAccessZgt ? (
-          <Link
-            href="/zgt"
-            className="inline-flex min-h-[42px] shrink-0 items-center gap-2 rounded-[13px] border border-line bg-white/4 px-3 text-xs font-semibold text-text-secondary no-underline transition hover:border-[color-mix(in_oklch,var(--cyan)_34%,transparent)] hover:bg-[color-mix(in_oklch,var(--cyan)_12%,transparent)] hover:text-cyan"
-          >
-            <DesktopTowerIcon size={16} weight="regular" aria-hidden />
-            ЗГТ
-          </Link>
-        ) : null}
-        <Link
-          href="/portal"
-          className="inline-flex min-h-[42px] shrink-0 items-center gap-2 rounded-[13px] border border-line bg-white/4 px-3 text-xs font-semibold text-text-secondary no-underline transition hover:border-line-strong hover:text-text-primary"
+      {!embedded ? (
+        <nav
+          className="flex min-w-0 items-center gap-1.5 max-[720px]:hidden"
+          aria-label="Рабочие модули"
         >
-          <SquaresFourIcon size={16} weight="regular" aria-hidden />
-          Модули
-        </Link>
-      </nav>
+          {props.canAccessZgt ? (
+            <Link
+              href="/zgt"
+              prefetch
+              className="inline-flex min-h-[42px] shrink-0 items-center gap-2 rounded-[13px] border border-line bg-white/4 px-3 text-xs font-semibold text-text-secondary no-underline transition hover:border-[color-mix(in_oklch,var(--cyan)_34%,transparent)] hover:bg-[color-mix(in_oklch,var(--cyan)_12%,transparent)] hover:text-cyan"
+            >
+              <DesktopTowerIcon size={16} weight="regular" aria-hidden />
+              ЗГТ
+            </Link>
+          ) : null}
+          <Link
+            href="/portal"
+            prefetch
+            className="inline-flex min-h-[42px] shrink-0 items-center gap-2 rounded-[13px] border border-line bg-white/4 px-3 text-xs font-semibold text-text-secondary no-underline transition hover:border-line-strong hover:text-text-primary"
+          >
+            <SquaresFourIcon size={16} weight="regular" aria-hidden />
+            Модули
+          </Link>
+        </nav>
+      ) : null}
       <div className="ml-auto flex shrink-0 items-center gap-2 max-[560px]:gap-1.5">
         <button
           className="relative hidden h-10 w-10 place-items-center rounded-xl border border-line text-text-secondary transition hover:border-line-strong hover:bg-white/7.5 max-[900px]:inline-grid"
@@ -79,9 +86,10 @@ export function TopBar(props: {
         >
           <ListIcon size={20} weight="bold" />
         </button>
-        {props.canAccessZgt ? (
+        {!embedded && props.canAccessZgt ? (
           <Link
             href="/zgt"
+            prefetch
             className="relative hidden h-10 w-10 place-items-center rounded-xl border border-line text-text-secondary no-underline transition hover:border-line-strong hover:bg-white/7.5 max-[720px]:inline-grid"
             aria-label="Перейти в ЗГТ"
             title="ЗГТ"
@@ -89,14 +97,17 @@ export function TopBar(props: {
             <DesktopTowerIcon size={20} weight="regular" />
           </Link>
         ) : null}
-        <Link
-          href="/portal"
-          className="relative hidden h-10 w-10 place-items-center rounded-xl border border-line text-text-secondary no-underline transition hover:border-line-strong hover:bg-white/7.5 max-[720px]:inline-grid"
-          aria-label="Модули портала"
-          title="Модули"
-        >
-          <SquaresFourIcon size={20} weight="regular" />
-        </Link>
+        {!embedded ? (
+          <Link
+            href="/portal"
+            prefetch
+            className="relative hidden h-10 w-10 place-items-center rounded-xl border border-line text-text-secondary no-underline transition hover:border-line-strong hover:bg-white/7.5 max-[720px]:inline-grid"
+            aria-label="Модули портала"
+            title="Модули"
+          >
+            <SquaresFourIcon size={20} weight="regular" />
+          </Link>
+        ) : null}
         <button
           className="relative grid h-10 w-10 place-items-center rounded-xl border border-line text-text-secondary transition hover:border-line-strong hover:bg-white/7.5"
           type="button"
@@ -142,16 +153,17 @@ export function TopBar(props: {
             <ArrowsOutSimpleIcon size={20} weight="regular" />
           )}
         </button>
-        <button
-          className="relative grid h-10 w-10 place-items-center rounded-xl border border-line text-text-secondary transition hover:border-line-strong hover:bg-white/7.5"
-          type="button"
-          onClick={props.onLogout}
-          aria-label="Выйти"
-        >
-          <SignOutIcon size={20} weight="regular" />
-        </button>
+        {!embedded ? (
+          <button
+            className="relative grid h-10 w-10 place-items-center rounded-xl border border-line text-text-secondary transition hover:border-line-strong hover:bg-white/7.5"
+            type="button"
+            onClick={props.onLogout}
+            aria-label="Выйти"
+          >
+            <SignOutIcon size={20} weight="regular" />
+          </button>
+        ) : null}
       </div>
-      {/* Added suppressHydrationWarning to resolve the error */}
       <div
         className="min-w-18 shrink-0 text-right font-mono text-lg font-bold leading-none text-text-primary max-[1100px]:hidden"
         suppressHydrationWarning

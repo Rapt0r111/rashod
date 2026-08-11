@@ -5,7 +5,6 @@ import { publishRosterChanged } from "@/server/events";
 import { setPostgresTaskCompleted } from "@/server/db/postgres-tasks-repository";
 import { apiError, parseJson, runAuditedMutation, uuidString } from "@/server/http";
 
-export const dynamic = "force-dynamic";
 const schema = z.object({ id: uuidString, completed: z.boolean() });
 
 export async function POST(request: Request) {

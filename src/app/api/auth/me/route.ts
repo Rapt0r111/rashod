@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/server/auth";
+import { liveJson } from "@/server/cache/http";
 
 export async function GET(request: Request) {
   const context = await getAuthContext(request);
-  if (!context) return NextResponse.json({ error: "AUTH_REQUIRED" }, { status: 401 });
-  return NextResponse.json(context, { headers: { "Cache-Control": "no-store" } });
+  if (!context) return liveJson({ error: "AUTH_REQUIRED" }, { status: 401 });
+  return NextResponse.json(context);
 }

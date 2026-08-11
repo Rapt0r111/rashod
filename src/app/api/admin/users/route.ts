@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { assertCanGrantRoles, assertCanManageUser, createUser, listUsers, requirePermission, updateUser } from "@/server/auth";
 import { apiError, idString, parseJson, runAuditedMutation, shortText, uniqueArray, uuidString } from "@/server/http";
+import { liveJson } from "@/server/cache/http";
 
 const roleIdsSchema = uniqueArray(idString, 32).refine((items) => items.length > 0, "ROLE_REQUIRED");
 const createSchema = z.object({ username: z.string().trim().min(3).max(64), password: z.string().min(12).max(256), displayName: shortText(160), roleIds: roleIdsSchema });
@@ -10,7 +11,7 @@ const updateSchema = z.object({ id: uuidString, displayName: shortText(160).opti
 export async function GET(request: Request) {
   const auth = await requirePermission(request, "users:manage");
   if (auth instanceof NextResponse) return auth;
-  return NextResponse.json({ users: await listUsers() }, { headers: { "Cache-Control": "no-store" } });
+  return liveJson({ users: await listUsers() });
 }
 
 export async function POST(request: Request) {
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
       { roleIds: input.roleIds },
       ({ id }) => id,
     );
-    return NextResponse.json(result, { status: 201 });
+    return liveJson(result, { status: 201 });
   } catch (error) {
     return apiError(error);
   }
@@ -53,7 +54,7 @@ export async function PUT(request: Request) {
       { active: input.active, changedPassword: input.password !== undefined, changedRoles: input.roleIds !== undefined },
       input.id,
     );
-    return NextResponse.json(result);
+    return liveJson(result);
   } catch (error) {
     return apiError(error);
   }

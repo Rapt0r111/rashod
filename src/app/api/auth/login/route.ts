@@ -4,7 +4,6 @@ import { authenticate, checkLoginRateLimit, createSession, recordAuditEvent, rec
 import { inPostgresTransaction } from "@/server/db/postgres";
 import { apiError, parseJson } from "@/server/http";
 
-export const dynamic = "force-dynamic";
 
 const loginSchema = z.object({ username: z.string().trim().min(3).max(64), password: z.string().min(1).max(256) });
 

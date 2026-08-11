@@ -12,8 +12,8 @@ import { publishRosterChanged } from "@/server/events";
 import { scheduleDateRange } from "@/features/schedule/logic";
 import { getPostgresScheduleSnapshot } from "@/server/db/postgres-schedule-repository";
 import { materializePostgresAutomaticDutyAssignments } from "@/server/db/postgres-groups-repository";
+import { liveJson } from "@/server/cache/http";
 
-export const dynamic = "force-dynamic";
 
 const schema = z.object({
   from: dateKeyString,
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   try {
     const input = await parseJson(request, schema);
     if (!scheduleDateRange(input.from, input.to)) {
-      return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
+      return liveJson({ error: "BAD_REQUEST" }, { status: 400 });
     }
     const snapshot = await runAuditedMutation(
       auth,
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
       { from: input.from, to: input.to, groupIds: input.groupIds ?? [] },
     );
     publishRosterChanged("groups");
-    return NextResponse.json(snapshot, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(snapshot);
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
     const message = error instanceof Error ? error.message : "";

@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  /**
+   * Cache Components (PPR): static shells prerender; dynamic holes stream.
+   * Live operational numbers stay outside `use cache` and use no-store APIs.
+   */
+  cacheComponents: true,
   allowedDevOrigins: [
     "10.*.*.*",
     "172.16.*.*",

@@ -7,9 +7,8 @@ import {
   TrashIcon,
   UsbIcon,
 } from "@phosphor-icons/react";
-import { PortalChrome } from "@/features/portal/PortalChrome";
+import { PortalPageHeader } from "@/features/portal/PortalChrome";
 import { hasPermission, type Permission } from "@/features/auth/permissions";
-import { hasRashodAccess, hasZgtAccess, type PortalModuleId } from "@/features/portal/modules";
 import { ZgtNav } from "./ZgtNav";
 import {
   STORAGE_ITEM_STATUSES,
@@ -74,18 +73,13 @@ async function postItem(body: unknown) {
 }
 
 export function StorageItemsApp({
-  displayName,
   permissions,
   initialData,
 }: {
-  displayName: string;
   permissions: readonly Permission[];
   initialData: StorageItemListResult;
 }) {
   const canWrite = hasPermission({ permissions: [...permissions] }, "zgt:write");
-  const availableModuleIds: PortalModuleId[] = [];
-  if (hasRashodAccess(permissions)) availableModuleIds.push("rashod");
-  if (hasZgtAccess(permissions)) availableModuleIds.push("zgt");
 
   const [data, setData] = useState(initialData);
   const [q, setQ] = useState("");
@@ -287,13 +281,11 @@ export function StorageItemsApp({
   );
 
   return (
-    <PortalChrome
-      activeModule="zgt"
-      displayName={displayName}
-      availableModuleIds={availableModuleIds}
-      title="Носители и пропуска"
-      subtitle="Флеш-накопители и электронные пропуска. Выдача — на людей из Расхода."
-    >
+    <>
+      <PortalPageHeader
+        title="Носители и пропуска"
+        subtitle="Флеш-накопители и электронные пропуска. Выдача — на людей из Расхода."
+      />
       <ZgtNav activePath="/zgt/storage-items" />
 
       <ZgtStatStrip
@@ -612,6 +604,6 @@ export function StorageItemsApp({
           </button>
         </div>
       </ZgtDialog>
-    </PortalChrome>
+    </>
   );
 }

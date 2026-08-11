@@ -22,8 +22,8 @@ import {
   EquipmentFormSchema,
   type EquipmentStatus,
 } from "@/features/zgt/types";
+import { liveJson } from "@/server/cache/http";
 
-export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const auth = await requirePermission(request, "zgt:read");
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
     sortBy: url.searchParams.get("sortBy") ?? undefined,
     sortDir: (url.searchParams.get("sortDir") as "asc" | "desc" | null) ?? undefined,
   });
-  return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
+  return liveJson(result);
 }
 
 export async function POST(request: Request) {

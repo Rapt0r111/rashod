@@ -7,9 +7,8 @@ import {
   PlusIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
-import { PortalChrome } from "@/features/portal/PortalChrome";
+import { PortalPageHeader } from "@/features/portal/PortalChrome";
 import { hasPermission, type Permission } from "@/features/auth/permissions";
-import { hasRashodAccess, hasZgtAccess, type PortalModuleId } from "@/features/portal/modules";
 import { ZgtNav } from "./ZgtNav";
 import {
   PHONE_STATUSES,
@@ -69,18 +68,13 @@ async function postPhone(body: unknown) {
 }
 
 export function PhonesApp({
-  displayName,
   permissions,
   initialData,
 }: {
-  displayName: string;
   permissions: readonly Permission[];
   initialData: PhoneListResult;
 }) {
   const canWrite = hasPermission({ permissions: [...permissions] }, "zgt:write");
-  const availableModuleIds: PortalModuleId[] = [];
-  if (hasRashodAccess(permissions)) availableModuleIds.push("rashod");
-  if (hasZgtAccess(permissions)) availableModuleIds.push("zgt");
 
   const [data, setData] = useState(initialData);
   const [q, setQ] = useState("");
@@ -262,13 +256,11 @@ export function PhonesApp({
   );
 
   return (
-    <PortalChrome
-      activeModule="zgt"
-      displayName={displayName}
-      availableModuleIds={availableModuleIds}
-      title="Личные телефоны"
-      subtitle="Сдача и выдача. Владелец — из реестра Расхода."
-    >
+    <>
+      <PortalPageHeader
+        title="Личные телефоны"
+        subtitle="Сдача и выдача. Владелец — из реестра Расхода."
+      />
       <ZgtNav activePath="/zgt/phones" />
 
       <ZgtStatStrip
@@ -590,6 +582,6 @@ export function PhonesApp({
           </button>
         </div>
       </ZgtDialog>
-    </PortalChrome>
+    </>
   );
 }

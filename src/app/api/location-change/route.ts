@@ -28,7 +28,6 @@ const undoSchema = z.object({
 });
 const idsSchema = z.object({ ids: uniqueArray(idString, 500).default([]) });
 
-export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   const auth = await requirePermission(request, "roster:write");

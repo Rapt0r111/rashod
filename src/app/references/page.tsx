@@ -1,18 +1,26 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { DynamicPage } from "@/components/dynamic-page";
 import { LoginScreen } from "@/features/auth/LoginScreen";
 import { hasPermission } from "@/features/auth/permissions";
 import { ReferencesApp } from "@/features/roster/ReferencesApp";
 import { getPostgresSnapshot } from "@/server/db/postgres-roster-repository";
-import { getAuthContextByToken, hasUsers } from "@/server/auth";
+import { getAuthContextByToken } from "@/server/auth";
+import { getCachedHasUsers } from "@/server/cache/stable-data";
 
-export const dynamic = "force-dynamic";
+export default function ReferencesPage() {
+  return (
+    <DynamicPage>
+      <ReferencesContent />
+    </DynamicPage>
+  );
+}
 
-export default async function ReferencesPage() {
+async function ReferencesContent() {
   const token = (await cookies()).get("rashod_session")?.value;
   const context = await getAuthContextByToken(token);
 
-  if (!context) return <LoginScreen setupRequired={!(await hasUsers())} />;
+  if (!context) return <LoginScreen setupRequired={!(await getCachedHasUsers())} />;
 
   if (!hasPermission(context, "references:manage")) {
     return (
@@ -34,5 +42,6 @@ export default async function ReferencesPage() {
     );
   }
 
+  // Live snapshot (includes people/locations) — not cached; client refreshes via SSE.
   return <ReferencesApp initialSnapshot={await getPostgresSnapshot()} />;
 }

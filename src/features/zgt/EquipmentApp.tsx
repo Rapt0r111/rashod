@@ -8,10 +8,9 @@ import {
   PlusIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
-import { PortalChrome } from "@/features/portal/PortalChrome";
+import { PortalPageHeader } from "@/features/portal/PortalChrome";
 import type { Permission } from "@/features/auth/permissions";
 import { hasPermission } from "@/features/auth/permissions";
-import { hasRashodAccess, hasZgtAccess, type PortalModuleId } from "@/features/portal/modules";
 import {
   batchIssue,
   batchMove,
@@ -87,18 +86,13 @@ function statusTone(status: EquipmentStatus) {
 }
 
 export function EquipmentApp({
-  displayName,
   permissions,
   initialData,
 }: {
-  displayName: string;
   permissions: readonly Permission[];
   initialData: EquipmentListResult;
 }) {
   const canWrite = hasPermission({ permissions: [...permissions] }, "zgt:write");
-  const availableModuleIds: PortalModuleId[] = [];
-  if (hasRashodAccess(permissions)) availableModuleIds.push("rashod");
-  if (hasZgtAccess(permissions)) availableModuleIds.push("zgt");
 
   const [data, setData] = useState(initialData);
   const [q, setQ] = useState("");
@@ -339,13 +333,11 @@ export function EquipmentApp({
   );
 
   return (
-    <PortalChrome
-      activeModule="zgt"
-      displayName={displayName}
-      availableModuleIds={availableModuleIds}
-      title="Вычислительная техника"
-      subtitle="Учёт ВТ. Владелец — человек из реестра Расхода."
-    >
+    <>
+      <PortalPageHeader
+        title="Вычислительная техника"
+        subtitle="Учёт ВТ. Владелец — человек из реестра Расхода."
+      />
       <ZgtNav activePath="/zgt/equipment" />
 
       <ZgtStatStrip
@@ -819,6 +811,6 @@ export function EquipmentApp({
           </>
         ) : null}
       </ZgtDialog>
-    </PortalChrome>
+    </>
   );
 }

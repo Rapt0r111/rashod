@@ -1,8 +1,7 @@
-import { NextResponse } from "next/server";
 import { pg } from "@/server/db/postgres";
 import { POSTGRES_MIGRATIONS } from "@/server/db/migrate-postgres";
+import { liveJson } from "@/server/cache/http";
 
-export const dynamic = "force-dynamic";
 
 /** Minimal non-sensitive readiness probe for LAN/offline startup checks. */
 export async function GET() {
@@ -30,13 +29,10 @@ export async function GET() {
       !schema[0]?.sessionsTable ||
       !schema[0]?.auditTable
     ) {
-      return NextResponse.json({ ok: false }, { status: 503 });
+      return liveJson({ ok: false }, { status: 503 });
     }
-    return NextResponse.json(
-      { ok: true },
-      { headers: { "Cache-Control": "no-store" } },
-    );
+    return liveJson({ ok: true });
   } catch {
-    return NextResponse.json({ ok: false }, { status: 503 });
+    return liveJson({ ok: false }, { status: 503 });
   }
 }

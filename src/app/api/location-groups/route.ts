@@ -20,7 +20,6 @@ const groupSchema = z.object({
   allowTransfer: z.boolean().optional(),
 });
 
-export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   const auth = await requirePermission(request, "references:manage");

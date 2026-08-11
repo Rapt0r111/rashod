@@ -15,8 +15,8 @@ import {
   PhoneFormSchema,
   type PhoneStatus,
 } from "@/features/zgt/phones-types";
+import { liveJson } from "@/server/cache/http";
 
-export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const auth = await requirePermission(request, "zgt:read");
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     status: (url.searchParams.get("status") as PhoneStatus | "") || undefined,
     page: Number(url.searchParams.get("page") ?? "1") || 1,
   });
-  return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
+  return liveJson(result);
 }
 
 export async function POST(request: Request) {

@@ -12,17 +12,18 @@ import { useState } from "react";
 import { fetchScheduleSnapshot } from "./schedule/api";
 import type { ScheduleSnapshot } from "./schedule/types";
 
+// Prefer data-fetch loading over a second dynamic() spinner flash.
 const GroupsApp = dynamic(
   () => import("./groups/GroupsApp").then((module) => module.GroupsApp),
-  { loading: () => <WorkspaceLoading /> },
+  { loading: () => null },
 );
 const TasksApp = dynamic(
   () => import("./tasks/TasksApp").then((module) => module.TasksApp),
-  { loading: () => <WorkspaceLoading /> },
+  { loading: () => null },
 );
 const ScheduleApp = dynamic(
   () => import("./schedule/ScheduleApp").then((module) => module.ScheduleApp),
-  { loading: () => <WorkspaceLoading /> },
+  { loading: () => null },
 );
 
 type WorkspaceProps =

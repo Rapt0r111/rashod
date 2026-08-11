@@ -8,6 +8,7 @@ import { publishRosterChanged } from "@/server/events";
 import { requirePermission } from "@/server/auth";
 import { normalizeOverviewSettings } from "@/features/roster/overview-settings";
 import { apiError, parseJson, runAuditedMutation, uniqueArray, uniqueArrayBy } from "@/server/http";
+import { liveJson } from "@/server/cache/http";
 
 const blockIds = [
   "hero",
@@ -36,14 +37,11 @@ const overviewSettingsSchema = z.looseObject({
   locationSelection: z.unknown().optional(),
 });
 
-export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const auth = await requirePermission(request, "roster:read");
   if (auth instanceof NextResponse) return auth;
-  return NextResponse.json(await getPostgresOverviewSettings(), {
-    headers: { "Cache-Control": "no-store" },
-  });
+  return liveJson(await getPostgresOverviewSettings());
 }
 
 export async function POST(request: Request) {

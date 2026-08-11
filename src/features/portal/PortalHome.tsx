@@ -2,34 +2,24 @@
 
 import Link from "next/link";
 import { ArrowRightIcon } from "@phosphor-icons/react";
-import { PortalChrome } from "./PortalChrome";
-import {
-  modulesForPermissions,
-  type PortalModuleId,
-} from "./modules";
+import { PortalPageHeader } from "./PortalChrome";
+import { modulesForPermissions } from "./modules";
 import type { Permission } from "@/features/auth/permissions";
 import { cx } from "@/features/roster/utils";
 
 export function PortalHome({
-  displayName,
   permissions,
 }: {
-  displayName: string;
   permissions: readonly Permission[];
 }) {
   const modules = modulesForPermissions(permissions);
-  const availableModuleIds = modules
-    .filter((module) => module.available)
-    .map((module) => module.id) as PortalModuleId[];
 
   return (
-    <PortalChrome
-      activeModule="portal"
-      displayName={displayName}
-      availableModuleIds={availableModuleIds}
-      title="Выберите рабочий модуль"
-      subtitle="Один вход для оперативных задач роты. Расход и ЗГТ остаются разными инструментами, но без повторного логина."
-    >
+    <>
+      <PortalPageHeader
+        title="Выберите рабочий модуль"
+        subtitle="Один вход для оперативных задач роты. Расход и ЗГТ остаются разными инструментами, но без повторного логина."
+      />
       <div className="grid gap-3 sm:grid-cols-2">
         {modules.map((module) => {
           const cardClass = cx(
@@ -86,6 +76,7 @@ export function PortalHome({
             <Link
               key={module.id}
               href={module.href}
+              prefetch
               className={cx(cardClass, "no-underline text-inherit")}
             >
               {body}
@@ -93,6 +84,6 @@ export function PortalHome({
           );
         })}
       </div>
-    </PortalChrome>
+    </>
   );
 }

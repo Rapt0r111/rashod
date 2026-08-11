@@ -8,10 +8,9 @@ import {
   UsbIcon,
   type Icon,
 } from "@phosphor-icons/react";
-import { PortalChrome } from "./PortalChrome";
-import type { PortalModuleId } from "./modules";
+import { PortalPageHeader } from "./PortalChrome";
 import type { Permission } from "@/features/auth/permissions";
-import { hasRashodAccess, hasZgtAccess } from "./modules";
+import { hasRashodAccess } from "./modules";
 import type { EquipmentStats } from "@/features/zgt/types";
 import type { PhoneStats } from "@/features/zgt/phones-types";
 import type { StorageItemStats } from "@/features/zgt/storage-items-types";
@@ -20,22 +19,16 @@ import { ZgtStatStrip, zgtBtnSecondaryClass } from "@/features/zgt/ui";
 import { cx } from "@/features/roster/utils";
 
 export function ZgtHome({
-  displayName,
   permissions,
   equipmentStats,
   phoneStats,
   storageStats,
 }: {
-  displayName: string;
   permissions: readonly Permission[];
   equipmentStats: EquipmentStats;
   phoneStats: PhoneStats;
   storageStats: StorageItemStats;
 }) {
-  const availableModuleIds: PortalModuleId[] = [];
-  if (hasRashodAccess(permissions)) availableModuleIds.push("rashod");
-  if (hasZgtAccess(permissions)) availableModuleIds.push("zgt");
-
   const attention =
     equipmentStats.repair +
     equipmentStats.broken +
@@ -43,13 +36,11 @@ export function ZgtHome({
     storageStats.lost;
 
   return (
-    <PortalChrome
-      activeModule="zgt"
-      displayName={displayName}
-      availableModuleIds={availableModuleIds}
-      title="ЗГТ"
-      subtitle="Техника, телефоны и носители. Владельцы — из реестра Расхода."
-    >
+    <>
+      <PortalPageHeader
+        title="ЗГТ"
+        subtitle="Техника, телефоны и носители. Владельцы — из реестра Расхода."
+      />
       <ZgtNav activePath="/zgt" />
 
       <ZgtStatStrip
@@ -175,7 +166,7 @@ export function ZgtHome({
           ) : null}
         </div>
       </section>
-    </PortalChrome>
+    </>
   );
 }
 
@@ -197,6 +188,7 @@ function ModuleCard({
   return (
     <Link
       href={href}
+      prefetch
       className="group flex min-h-52 flex-col rounded-2xl border border-line bg-bg-panel/80 p-4 no-underline text-inherit transition-[border-color,background-color] duration-150 hover:border-line-strong hover:bg-bg-raised/70 sm:p-5"
     >
       <div className="flex items-start gap-3">

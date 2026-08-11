@@ -9,8 +9,8 @@ import {
 import { publishRosterChanged } from "@/server/events";
 import { requirePermission } from "@/server/auth";
 import { apiError, idString, optionalText, parseJson, runAuditedMutation, shortText } from "@/server/http";
+import { liveJson } from "@/server/cache/http";
 
-export const dynamic = "force-dynamic";
 
 const createSchema = z.object({
   name: shortText(120),
@@ -30,9 +30,7 @@ const deleteSchema = z.object({ id: idString });
 export async function GET(request: Request) {
   const auth = await requirePermission(request, "groups:read");
   if (auth instanceof NextResponse) return auth;
-  return NextResponse.json(await getGroupsSnapshot(), {
-    headers: { "Cache-Control": "no-store" },
-  });
+  return liveJson(await getGroupsSnapshot());
 }
 
 export async function POST(request: Request) {

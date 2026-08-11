@@ -8,6 +8,7 @@ import {
 import { publishRosterChanged } from "@/server/events";
 import { requireAnyPermission, requirePermission } from "@/server/auth";
 import { apiError, optionalIdString, parseJson, runAuditedMutation, shortText, sortOrder } from "@/server/http";
+import { liveJson } from "@/server/cache/http";
 
 const schema = z.object({
   id: optionalIdString,
@@ -17,15 +18,12 @@ const schema = z.object({
   isSystem: z.boolean().optional(),
 });
 
-export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const auth = await requireAnyPermission(request, ["roster:read", "references:manage"]);
   if (auth instanceof NextResponse) return auth;
   const snapshot = await getSnapshot();
-  return NextResponse.json(snapshot.platoons, {
-    headers: { "Cache-Control": "no-store" },
-  });
+  return liveJson(snapshot.platoons);
 }
 
 export async function POST(request: Request) {

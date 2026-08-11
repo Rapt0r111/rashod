@@ -428,6 +428,9 @@ export async function createUser(input: {
       throw error;
     throw new Error("USERNAME_EXISTS");
   }
+  // Defer import to avoid cycles; setup-gate cache must drop after first user.
+  const { invalidateHasUsersCache } = await import("@/server/cache/stable-data");
+  invalidateHasUsersCache();
   return id;
 }
 export async function updateUser(input: {

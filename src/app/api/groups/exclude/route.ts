@@ -8,7 +8,6 @@ import { publishRosterChanged } from "@/server/events";
 import { requirePermission } from "@/server/auth";
 import { apiError, idString, optionalText, parseJson, runAuditedMutation } from "@/server/http";
 
-export const dynamic = "force-dynamic";
 
 const postSchema = z.object({
   groupId: idString,

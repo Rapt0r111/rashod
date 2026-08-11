@@ -1,7 +1,7 @@
 import { subscribe } from "@/server/events";
 import { requireAnyPermission } from "@/server/auth";
+import { sseHeaders } from "@/server/cache/http";
 
-export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const auth = await requireAnyPermission(request, ["roster:read", "groups:read", "tasks:read"]);
@@ -50,10 +50,6 @@ export async function GET(request: Request) {
   });
 
   return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream; charset=utf-8",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-    },
+    headers: sseHeaders(),
   });
 }

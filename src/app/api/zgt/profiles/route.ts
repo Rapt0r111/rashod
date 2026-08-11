@@ -4,7 +4,6 @@ import { requirePermission } from "@/server/auth";
 import { upsertPersonnelProfile } from "@/server/db/postgres-zgt-repository";
 import { apiError, idString, optionalText, parseJson, runAuditedMutation } from "@/server/http";
 
-export const dynamic = "force-dynamic";
 
 const profileSchema = z.object({
   personId: idString,

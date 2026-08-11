@@ -5,7 +5,6 @@ import { publishRosterChanged } from "@/server/events";
 import { requirePermission } from "@/server/auth";
 import { apiError, idString, parseJson, runAuditedMutation, uniqueArray } from "@/server/http";
 
-export const dynamic = "force-dynamic";
 
 const schema = z.object({
   groupId: idString,

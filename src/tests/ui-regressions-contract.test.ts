@@ -17,7 +17,10 @@ describe("Critical UI regression contracts", () => {
     const topBar = read("src/features/roster/components/top-bar.tsx");
     const navigation = read("src/features/roster/components/navigation.tsx");
     const app = read("src/features/roster/RosterApp.tsx");
+    const modulesLayout = read("src/app/(modules)/layout.tsx");
 
+    // Portal/ZGT share a layout shell; roster keeps its own TopBar module links.
+    expect(modulesLayout).toContain("PortalShell");
     expect(topBar).toContain('href="/zgt"');
     expect(topBar).toContain('href="/portal"');
     expect(topBar).toContain("canAccessZgt");
