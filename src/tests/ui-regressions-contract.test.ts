@@ -13,6 +13,20 @@ describe("Critical UI regression contracts", () => {
     expect(navigation).toContain("onClick={onLogout}");
   });
 
+  it("exposes navigation into ZGT and portal modules from roster shell", () => {
+    const topBar = read("src/features/roster/components/top-bar.tsx");
+    const navigation = read("src/features/roster/components/navigation.tsx");
+    const app = read("src/features/roster/RosterApp.tsx");
+
+    expect(topBar).toContain('href="/zgt"');
+    expect(topBar).toContain('href="/portal"');
+    expect(topBar).toContain("canAccessZgt");
+    expect(navigation).toContain('href="/zgt"');
+    expect(navigation).toContain('href="/portal"');
+    expect(app).toContain('hasPermission(permissionContext, "zgt:read")');
+    expect(app).toContain("canAccessZgt={canAccessZgt}");
+  });
+
   it("filters inaccessible service sections and rejects forbidden history state", () => {
     const app = read("src/features/roster/RosterApp.tsx");
     const navigation = read("src/features/roster/components/navigation.tsx");

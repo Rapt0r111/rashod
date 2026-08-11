@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   ClockCounterClockwiseIcon,
   DownloadSimpleIcon,
@@ -9,6 +10,8 @@ import {
   ArrowsOutSimpleIcon,
   ArrowsInSimpleIcon,
   SignOutIcon,
+  DesktopTowerIcon,
+  SquaresFourIcon,
 } from "@phosphor-icons/react";
 import { formatClock, formatDateLabel } from "../utils";
 
@@ -20,6 +23,7 @@ export function TopBar(props: {
   onExport: () => void;
   onAdmin: () => void;
   canManageReferences: boolean;
+  canAccessZgt?: boolean;
   onLogout: () => void;
   onToggleFullscreen: () => void;
 }) {
@@ -45,6 +49,27 @@ export function TopBar(props: {
           </div>
         </div>
       </div>
+      <nav
+        className="flex min-w-0 items-center gap-1.5 max-[720px]:hidden"
+        aria-label="Рабочие модули"
+      >
+        {props.canAccessZgt ? (
+          <Link
+            href="/zgt"
+            className="inline-flex min-h-[42px] shrink-0 items-center gap-2 rounded-[13px] border border-line bg-white/4 px-3 text-xs font-semibold text-text-secondary no-underline transition hover:border-[color-mix(in_oklch,var(--cyan)_34%,transparent)] hover:bg-[color-mix(in_oklch,var(--cyan)_12%,transparent)] hover:text-cyan"
+          >
+            <DesktopTowerIcon size={16} weight="regular" aria-hidden />
+            ЗГТ
+          </Link>
+        ) : null}
+        <Link
+          href="/portal"
+          className="inline-flex min-h-[42px] shrink-0 items-center gap-2 rounded-[13px] border border-line bg-white/4 px-3 text-xs font-semibold text-text-secondary no-underline transition hover:border-line-strong hover:text-text-primary"
+        >
+          <SquaresFourIcon size={16} weight="regular" aria-hidden />
+          Модули
+        </Link>
+      </nav>
       <div className="ml-auto flex shrink-0 items-center gap-2 max-[560px]:gap-1.5">
         <button
           className="relative hidden h-10 w-10 place-items-center rounded-xl border border-line text-text-secondary transition hover:border-line-strong hover:bg-white/7.5 max-[900px]:inline-grid"
@@ -54,6 +79,24 @@ export function TopBar(props: {
         >
           <ListIcon size={20} weight="bold" />
         </button>
+        {props.canAccessZgt ? (
+          <Link
+            href="/zgt"
+            className="relative hidden h-10 w-10 place-items-center rounded-xl border border-line text-text-secondary no-underline transition hover:border-line-strong hover:bg-white/7.5 max-[720px]:inline-grid"
+            aria-label="Перейти в ЗГТ"
+            title="ЗГТ"
+          >
+            <DesktopTowerIcon size={20} weight="regular" />
+          </Link>
+        ) : null}
+        <Link
+          href="/portal"
+          className="relative hidden h-10 w-10 place-items-center rounded-xl border border-line text-text-secondary no-underline transition hover:border-line-strong hover:bg-white/7.5 max-[720px]:inline-grid"
+          aria-label="Модули портала"
+          title="Модули"
+        >
+          <SquaresFourIcon size={20} weight="regular" />
+        </Link>
         <button
           className="relative grid h-10 w-10 place-items-center rounded-xl border border-line text-text-secondary transition hover:border-line-strong hover:bg-white/7.5"
           type="button"

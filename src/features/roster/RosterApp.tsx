@@ -103,6 +103,7 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
   const canWriteGroups = hasPermission(permissionContext, "groups:write");
   const canReadTasks = hasPermission(permissionContext, "tasks:read");
   const canWriteTasks = hasPermission(permissionContext, "tasks:write");
+  const canAccessZgt = hasPermission(permissionContext, "zgt:read");
   const [state, dispatch] = useReducer(reducer, {
     ...initialSnapshot,
     ui: initialUi,
@@ -644,6 +645,7 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
         }
         onAdmin={() => openAdmin()}
         canManageReferences={canManageReferences}
+        canAccessZgt={canAccessZgt}
         onLogout={logout}
         onToggleFullscreen={toggleFullscreen}
       />
@@ -655,6 +657,7 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
           onSelect={selectSection}
           canReadGroups={canReadGroups}
           canReadTasks={canReadTasks}
+          canAccessZgt={canAccessZgt}
         />
         <main
           ref={mainRef}
@@ -776,6 +779,7 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
           openAdmin();
         }}
         canManageReferences={canManageReferences}
+        canAccessZgt={canAccessZgt}
         canReadGroups={canReadGroups}
         canReadTasks={canReadTasks}
         onLogout={() => {

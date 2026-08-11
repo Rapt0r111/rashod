@@ -175,7 +175,7 @@ export function AdminPanel({
             <section className="min-w-0 overflow-hidden rounded-3xl border border-line bg-bg-panel/75" aria-labelledby="reference-content-title">
               <div className="flex min-w-0 items-start justify-between gap-4 border-b border-line px-5 py-4 max-[720px]:px-4">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-cyan">{referenceTabIcon(tab)}<span className="text-[11px] font-bold uppercase tracking-[0.14em]">Раздел справочника</span></div>
+                  <div className="flex items-center gap-2 text-cyan">{referenceTabIcon(tab)}<span className="text-xs font-semibold text-text-muted">Раздел справочника</span></div>
                   <h2 id="reference-content-title" className="m-0 mt-2 truncate text-xl font-extrabold text-text-primary">{tabMeta.label}</h2>
                   <p className="m-0 mt-1 text-sm text-text-muted">{tabMeta.description}</p>
                 </div>

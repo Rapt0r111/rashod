@@ -71,10 +71,44 @@ function GroupsWorkspace({ initialSnapshot, canWrite }: { initialSnapshot: Group
   return (
     <main className="h-dvh min-h-0 min-w-0 overflow-y-auto overscroll-contain bg-bg-base">
       <nav className="sticky top-0 z-20 flex gap-2 border-b border-line bg-bg-base/95 px-3 py-2 backdrop-blur md:px-4" aria-label="Разделы групп">
-        <button type="button" className={`min-h-9 rounded-lg border px-3 text-sm font-bold ${view === "groups" ? "border-accent-line bg-accent-soft text-text-primary" : "border-line text-text-secondary"}`} onClick={() => setView("groups")}>Группы</button>
-        <button type="button" className={`min-h-9 rounded-lg border px-3 text-sm font-bold ${view === "schedule" ? "border-accent-line bg-accent-soft text-text-primary" : "border-line text-text-secondary"}`} onClick={() => void openSchedule()}>График</button>
+        <button
+          type="button"
+          className={`inline-flex min-h-[42px] items-center rounded-[13px] border px-3 text-sm font-semibold transition-[background-color,border-color,color] duration-150 ${view === "groups" ? "border-accent-line bg-accent-soft text-text-primary" : "border-line text-text-secondary hover:border-line-strong hover:text-text-primary"}`}
+          onClick={() => setView("groups")}
+        >
+          Группы
+        </button>
+        <button
+          type="button"
+          className={`inline-flex min-h-[42px] items-center rounded-[13px] border px-3 text-sm font-semibold transition-[background-color,border-color,color] duration-150 ${view === "schedule" ? "border-accent-line bg-accent-soft text-text-primary" : "border-line text-text-secondary hover:border-line-strong hover:text-text-primary"}`}
+          onClick={() => void openSchedule()}
+        >
+          График
+        </button>
       </nav>
-      {view === "groups" ? <GroupsApp initialSnapshot={initialSnapshot} canWrite={canWrite} /> : loadingSchedule ? <WorkspaceLoading /> : scheduleSnapshot ? <ScheduleApp initialSnapshot={scheduleSnapshot} canWrite={canWrite} onOpenGroups={() => setView("groups")} onSnapshotChange={setScheduleSnapshot} /> : <div className="grid min-h-55 place-items-center gap-3 p-5 text-center text-sm text-red"><span>{scheduleError ?? "Не удалось загрузить график."}</span><button type="button" className="min-h-10 rounded-xl border border-accent-line bg-accent-soft px-4 font-bold text-text-primary" onClick={() => void openSchedule()}>Повторить</button></div>}
+      {view === "groups" ? (
+        <GroupsApp initialSnapshot={initialSnapshot} canWrite={canWrite} />
+      ) : loadingSchedule ? (
+        <WorkspaceLoading />
+      ) : scheduleSnapshot ? (
+        <ScheduleApp
+          initialSnapshot={scheduleSnapshot}
+          canWrite={canWrite}
+          onOpenGroups={() => setView("groups")}
+          onSnapshotChange={setScheduleSnapshot}
+        />
+      ) : (
+        <div className="grid min-h-55 place-items-center gap-3 p-5 text-center text-sm text-red">
+          <span>{scheduleError ?? "Не удалось загрузить график."}</span>
+          <button
+            type="button"
+            className="inline-flex min-h-[42px] items-center rounded-[10px] border border-accent-line bg-accent-soft px-4 font-semibold text-text-primary"
+            onClick={() => void openSchedule()}
+          >
+            Повторить
+          </button>
+        </div>
+      )}
     </main>
   );
 }

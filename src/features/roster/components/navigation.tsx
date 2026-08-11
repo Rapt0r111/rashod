@@ -1,8 +1,11 @@
+import Link from "next/link";
 import {
   ClockCounterClockwiseIcon,
+  DesktopTowerIcon,
   DownloadSimpleIcon,
   SignOutIcon,
   SidebarSimpleIcon,
+  SquaresFourIcon,
   UsersThreeIcon,
   XIcon,
 } from "@phosphor-icons/react";
@@ -40,6 +43,7 @@ export function Sidebar({
   onSelect,
   canReadGroups,
   canReadTasks,
+  canAccessZgt = false,
 }: {
   people: Person[];
   counts: SectionCounts;
@@ -47,6 +51,7 @@ export function Sidebar({
   onSelect: (key: string) => void;
   canReadGroups: boolean;
   canReadTasks: boolean;
+  canAccessZgt?: boolean;
 }) {
   const items = sectionItems(people, counts, canReadGroups, canReadTasks);
   return (
@@ -72,10 +77,28 @@ export function Sidebar({
           </button>
         ))}
       </nav>
-      <p className="mt-3 mb-0 wrap-anywhere text-[11px] leading-[1.45] text-text-muted">
-        Данные работают локально и синхронизируются между устройствами через
-        этот сервер.
-      </p>
+      <div className="mt-3 grid min-w-0 gap-1.5 border-t border-line pt-3">
+        {canAccessZgt ? (
+          <Link
+            href="/zgt"
+            className="grid min-h-[42px] w-full min-w-0 grid-cols-[20px_minmax(0,1fr)] items-center gap-2 overflow-hidden rounded-[13px] border border-line bg-white/4 px-2 text-left text-sm font-semibold text-text-secondary no-underline transition hover:border-[color-mix(in_oklch,var(--cyan)_34%,transparent)] hover:bg-[color-mix(in_oklch,var(--cyan)_12%,transparent)] hover:text-cyan"
+          >
+            <DesktopTowerIcon size={18} weight="regular" aria-hidden />
+            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">ЗГТ</span>
+          </Link>
+        ) : null}
+        <Link
+          href="/portal"
+          className="grid min-h-[42px] w-full min-w-0 grid-cols-[20px_minmax(0,1fr)] items-center gap-2 overflow-hidden rounded-[13px] border border-transparent px-2 text-left text-sm font-semibold text-text-muted no-underline transition hover:border-line hover:bg-white/4 hover:text-text-primary"
+        >
+          <SquaresFourIcon size={18} weight="regular" aria-hidden />
+          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">Модули</span>
+        </Link>
+        <p className="mb-0 wrap-anywhere text-[11px] leading-[1.45] text-text-muted">
+          Данные работают локально и синхронизируются между устройствами через
+          этот сервер.
+        </p>
+      </div>
     </aside>
   );
 }
@@ -91,6 +114,7 @@ export function SectionDrawer({
   onExport,
   onAdmin,
   canManageReferences,
+  canAccessZgt = false,
   onLogout,
   canReadGroups,
   canReadTasks,
@@ -105,6 +129,7 @@ export function SectionDrawer({
   onExport: () => void;
   onAdmin: () => void;
   canManageReferences: boolean;
+  canAccessZgt?: boolean;
   onLogout: () => void;
   canReadGroups: boolean;
   canReadTasks: boolean;
@@ -116,7 +141,7 @@ export function SectionDrawer({
     <div className="fixed inset-0 z-60 grid items-stretch justify-items-start bg-bg-overlay backdrop-blur-[10px]" onMouseDown={onClose}>
       <aside
         ref={panelRef}
-        className="grid h-dvh w-[min(360px,calc(100vw-24px))] grid-rows-[auto_auto_minmax(0,1fr)] border-r border-line-strong bg-[color-mix(in_oklch,var(--bg-base)_92%,transparent)] shadow-[30px_0_90px_rgb(0_0_0/0.42)]"
+        className="grid h-dvh w-[min(360px,calc(100vw-24px))] grid-rows-[auto_auto_minmax(0,1fr)_auto] border-r border-line-strong bg-[color-mix(in_oklch,var(--bg-base)_92%,transparent)] shadow-[30px_0_90px_rgb(0_0_0/0.42)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="section-drawer-title"
@@ -176,6 +201,26 @@ export function SectionDrawer({
             </button>
           ))}
         </nav>
+        <div className="grid gap-2 border-t border-line p-3" aria-label="Рабочие модули">
+          {canAccessZgt ? (
+            <Link
+              href="/zgt"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[15px] border border-[color-mix(in_oklch,var(--cyan)_34%,transparent)] bg-[color-mix(in_oklch,var(--cyan)_12%,transparent)] px-3 text-sm font-semibold text-cyan no-underline"
+              onClick={onClose}
+            >
+              <DesktopTowerIcon size={18} weight="regular" aria-hidden />
+              Перейти в ЗГТ
+            </Link>
+          ) : null}
+          <Link
+            href="/portal"
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[15px] border border-line bg-white/4 px-3 text-sm font-semibold text-text-secondary no-underline"
+            onClick={onClose}
+          >
+            <SquaresFourIcon size={18} weight="regular" aria-hidden />
+            Все модули
+          </Link>
+        </div>
       </aside>
     </div>
   );

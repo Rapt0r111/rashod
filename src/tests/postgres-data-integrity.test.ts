@@ -20,8 +20,20 @@ describe("PostgreSQL data integrity normalization", () => {
     expect(normalizeActiveDays([9], [3])).toEqual([3]);
   });
 
-  it("keeps the data-integrity migration in the runner order", () => {
-    expect(POSTGRES_MIGRATIONS.at(-1)).toBe("0010_group_overlap_policy.sql");
+  it("keeps the data-integrity and ZГТ migrations in the runner order", () => {
+    expect(POSTGRES_MIGRATIONS).toContain("0010_group_overlap_policy.sql");
+    expect(POSTGRES_MIGRATIONS).toEqual(
+      expect.arrayContaining([
+        "0010_group_overlap_policy.sql",
+        "0011_zgt_personnel_and_equipment.sql",
+        "0012_zgt_phones_and_storage_items.sql",
+      ]),
+    );
+    const idx10 = POSTGRES_MIGRATIONS.indexOf("0010_group_overlap_policy.sql");
+    const idx11 = POSTGRES_MIGRATIONS.indexOf("0011_zgt_personnel_and_equipment.sql");
+    const idx12 = POSTGRES_MIGRATIONS.indexOf("0012_zgt_phones_and_storage_items.sql");
+    expect(idx11).toBeGreaterThan(idx10);
+    expect(idx12).toBeGreaterThan(idx11);
     expect(migrationPath("/repo", "0010_group_overlap_policy.sql")).toContain("drizzle");
   });
 

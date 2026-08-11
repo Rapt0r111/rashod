@@ -48,5 +48,6 @@ describe("RBAC delegation policy", () => {
   it("makes snapshot-returning write permissions explicitly imply read", () => {
     expect(hasPermission({ permissions: ["roster:write"] }, "roster:read")).toBe(true);
     expect(hasPermission({ permissions: ["groups:write"] }, "groups:read")).toBe(true);
+    expect(hasPermission({ permissions: ["zgt:write"] }, "zgt:read")).toBe(true);
   });
 });
