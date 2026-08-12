@@ -68,6 +68,8 @@ describe("server HTTP contract", () => {
     ["PAYLOAD_TOO_LARGE", 413],
     ["ROLE_PERMISSIONS_REQUIRED", 400],
     ["ROLE_GRANT_FORBIDDEN", 403],
+    ["SYSTEM_LOCATION_PROTECTED", 409],
+    ["SYSTEM_PLATOON_PROTECTED", 409],
   ])("maps %s", async (code, status) => {
     expect(apiError(new Error(code)).status).toBe(status);
   });

@@ -16,6 +16,18 @@ describe("Reference directory UI contract", () => {
     expect(admin).toContain("lg:grid-cols-[260px_minmax(0,1fr)]");
   });
 
+  it("does not accept client-supplied isSystem on location or platoon writes", () => {
+    const locations = read("src/app/api/locations/route.ts");
+    const platoons = read("src/app/api/platoons/route.ts");
+    const locationAdmin = read("src/features/roster/components/admin/location-admin.tsx");
+    const platoonAdmin = read("src/features/roster/components/admin/platoon-admin.tsx");
+
+    expect(locations).not.toContain("isSystem");
+    expect(platoons).not.toContain("isSystem");
+    expect(locationAdmin).not.toContain("isSystem: editing");
+    expect(platoonAdmin).not.toContain("isSystem: editing");
+  });
+
   it("makes the active reference tab explicit beyond color", () => {
     const admin = read("src/features/roster/components/admin-panel.tsx");
 

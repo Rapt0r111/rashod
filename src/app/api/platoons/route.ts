@@ -15,7 +15,6 @@ const schema = z.object({
   key: optionalIdString,
   label: shortText(120),
   sortOrder,
-  isSystem: z.boolean().optional(),
 });
 
 

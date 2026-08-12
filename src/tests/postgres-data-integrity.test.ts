@@ -41,4 +41,26 @@ describe("PostgreSQL data integrity normalization", () => {
     expect(rosterRepositorySource).toContain("${sql.json(config)}::jsonb");
     expect(rosterRepositorySource).not.toContain("${JSON.stringify(config)}::jsonb");
   });
+
+  it("never writes client-supplied isSystem onto locations or platoons", () => {
+    expect(rosterRepositorySource).not.toContain("input.isSystem");
+    expect(rosterRepositorySource).not.toContain("is_system = EXCLUDED.is_system");
+    expect(rosterRepositorySource).toContain(
+      "${record.quickCode}, false, ${record.countsAsPresent}, ${record.sortOrder}",
+    );
+    expect(rosterRepositorySource).toContain(
+      "VALUES (${record.id}, ${record.key}, ${record.label}, ${record.sortOrder}, false)",
+    );
+  });
+
+  it("hard-blocks DELETE of system locations and platoons", () => {
+    expect(rosterRepositorySource).toContain('throw new Error("SYSTEM_LOCATION_PROTECTED")');
+    expect(rosterRepositorySource).toContain('throw new Error("SYSTEM_PLATOON_PROTECTED")');
+    expect(rosterRepositorySource).toContain(
+      'SELECT is_system AS "isSystem" FROM platoons WHERE id = ${id} FOR UPDATE',
+    );
+    expect(rosterRepositorySource).toContain(
+      "SELECT key, is_system AS \"isSystem\" FROM locations WHERE id = ${id} FOR UPDATE",
+    );
+  });
 });

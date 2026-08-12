@@ -32,7 +32,6 @@ export function PlatoonAdmin({
         body: JSON.stringify({
           id: editing?.id,
           label,
-          isSystem: editing?.isSystem,
         }),
         }),
       );

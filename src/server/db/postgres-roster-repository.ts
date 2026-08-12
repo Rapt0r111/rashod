@@ -170,13 +170,43 @@ export async function deletePostgresPerson(id: string) {
 }
 
 function slug(value: string) { return value.toLocaleLowerCase("ru-RU").replace(/[^a-zа-я0-9]+/giu, "-").replace(/^-+|-+$/g, "") || randomUUID(); }
-export async function upsertPostgresPlatoon(input: Partial<Platoon> & Pick<Platoon, "label">) {
-  const record = { id: input.id ?? randomUUID(), key: input.key?.trim() || slug(input.label), label: input.label.trim(), sortOrder: input.sortOrder ?? Date.now(), isSystem: input.isSystem ?? false };
-  const rows = await pg()<Platoon[]>`INSERT INTO platoons (id, key, label, sort_order, is_system) VALUES (${record.id}, ${record.key}, ${record.label}, ${record.sortOrder}, ${record.isSystem}) ON CONFLICT (id) DO UPDATE SET key = EXCLUDED.key, label = EXCLUDED.label, sort_order = EXCLUDED.sort_order, is_system = EXCLUDED.is_system RETURNING id, key, label, sort_order AS "sortOrder", is_system AS "isSystem"`;
+export async function upsertPostgresPlatoon(
+  input: Omit<Partial<Platoon>, "isSystem"> & Pick<Platoon, "label">,
+) {
+  const record = {
+    id: input.id ?? randomUUID(),
+    key: input.key?.trim() || slug(input.label),
+    label: input.label.trim(),
+    sortOrder: input.sortOrder ?? Date.now(),
+  };
+  const rows = await pg()<Platoon[]>`
+    INSERT INTO platoons (id, key, label, sort_order, is_system)
+    VALUES (${record.id}, ${record.key}, ${record.label}, ${record.sortOrder}, false)
+    ON CONFLICT (id) DO UPDATE SET
+      key = EXCLUDED.key,
+      label = EXCLUDED.label,
+      sort_order = EXCLUDED.sort_order
+    RETURNING id, key, label, sort_order AS "sortOrder", is_system AS "isSystem"
+  `;
   return rows[0];
 }
-export async function deletePostgresPlatoon(id: string) { if ((await pg()`SELECT 1 FROM people WHERE platoon_id = ${id} LIMIT 1`).length) throw new Error("PLATOON_IN_USE"); await pg()`DELETE FROM platoons WHERE id = ${id}`; }
-export async function upsertPostgresLocation(input: Partial<LocationOption> & Pick<LocationOption, "label">) {
+export async function deletePostgresPlatoon(id: string) {
+  await inPostgresTransaction(async (transaction) => {
+    const platoon = (
+      await transaction<Array<{ isSystem: boolean }>>`
+        SELECT is_system AS "isSystem" FROM platoons WHERE id = ${id} FOR UPDATE
+      `
+    )[0];
+    if (!platoon) return;
+    if (platoon.isSystem) throw new Error("SYSTEM_PLATOON_PROTECTED");
+    if ((await transaction`SELECT 1 FROM people WHERE platoon_id = ${id} LIMIT 1`).length)
+      throw new Error("PLATOON_IN_USE");
+    await transaction`DELETE FROM platoons WHERE id = ${id}`;
+  });
+}
+export async function upsertPostgresLocation(
+  input: Omit<Partial<LocationOption>, "isSystem"> & Pick<LocationOption, "label">,
+) {
   const sql = pg();
   const existing = input.id
     ? (await sql<Array<{ key: string; countsAsPresent: boolean }>>`
@@ -190,7 +220,6 @@ export async function upsertPostgresLocation(input: Partial<LocationOption> & Pi
     colorToken: input.colorToken ?? "neutral",
     isQuick: input.isQuick ?? false,
     quickCode: input.quickCode?.trim() || null,
-    isSystem: input.isSystem ?? false,
     countsAsPresent: input.countsAsPresent ?? existing?.countsAsPresent ?? false,
     sortOrder: input.sortOrder ?? Date.now(),
   };
@@ -199,7 +228,7 @@ export async function upsertPostgresLocation(input: Partial<LocationOption> & Pi
       INSERT INTO locations (id, key, label, color_token, is_quick, quick_code, is_system, counts_as_present, sort_order)
       VALUES (
         ${record.id}, ${record.key}, ${record.label}, ${record.colorToken}, ${record.isQuick},
-        ${record.quickCode}, ${record.isSystem}, ${record.countsAsPresent}, ${record.sortOrder}
+        ${record.quickCode}, false, ${record.countsAsPresent}, ${record.sortOrder}
       )
       ON CONFLICT (id) DO UPDATE SET
         key = EXCLUDED.key,
@@ -207,7 +236,6 @@ export async function upsertPostgresLocation(input: Partial<LocationOption> & Pi
         color_token = EXCLUDED.color_token,
         is_quick = EXCLUDED.is_quick,
         quick_code = EXCLUDED.quick_code,
-        is_system = EXCLUDED.is_system,
         counts_as_present = EXCLUDED.counts_as_present,
         sort_order = EXCLUDED.sort_order
       RETURNING
@@ -297,8 +325,13 @@ export async function upsertPostgresOverviewSettings(input: OverviewSettings) {
 
 export async function deletePostgresLocation(id: string) {
   await inPostgresTransaction(async (transaction) => {
-    const location = (await transaction<Array<{ key: string }>>`SELECT key FROM locations WHERE id = ${id} FOR UPDATE`)[0];
+    const location = (
+      await transaction<Array<{ key: string; isSystem: boolean }>>`
+        SELECT key, is_system AS "isSystem" FROM locations WHERE id = ${id} FOR UPDATE
+      `
+    )[0];
     if (!location) return;
+    if (location.isSystem) throw new Error("SYSTEM_LOCATION_PROTECTED");
     if ((await transaction`SELECT 1 FROM people WHERE location = ${location.key} LIMIT 1`).length) throw new Error("LOCATION_IN_USE");
     await transaction`DELETE FROM location_group_members WHERE location_key = ${location.key}`;
     await transaction`DELETE FROM locations WHERE id = ${id}`;

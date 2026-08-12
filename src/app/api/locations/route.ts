@@ -18,7 +18,6 @@ const schema = z.object({
   quickCode: z.string().trim().min(1).max(16).nullable().optional(),
   countsAsPresent: z.boolean().optional(),
   sortOrder,
-  isSystem: z.boolean().optional(),
 });
 
 

@@ -40,7 +40,6 @@ export function LocationAdmin({
         body: JSON.stringify({
           ...form,
           id: editing?.id,
-          isSystem: editing?.isSystem,
           quickCode: form.quickCode || null,
         }),
         }),
