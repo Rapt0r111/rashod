@@ -8,6 +8,7 @@ import {
   type Permission,
 } from "@/features/auth/permissions";
 import {
+  assertCanSaveRole,
   canGrantRole,
   canManageTargetAccount,
   isAdministrator,
@@ -548,20 +549,31 @@ export async function saveRole(
   if (!/^[a-z][a-z0-9_-]{2,63}$/.test(key)) throw new Error("INVALID_ROLE_KEY");
   if (!input.name.trim() || input.name.length > 120)
     throw new Error("ROLE_NAME_REQUIRED");
-  const existing = input.id ? (await rolesByIds([id]))[0] : undefined;
-  if (existing?.isSystem || id === ADMIN_ROLE_ID)
-    throw new Error("SYSTEM_ROLE_PROTECTED");
-  assertGrantable(context, [
-    { id, isSystem: false, permissions: [...new Set(input.permissions)] },
-  ]);
-  const sql = pg();
-  const duplicate =
-    await sql`SELECT id FROM roles WHERE key = ${key} AND id <> ${id}`;
-  if (duplicate.length) throw new Error("ROLE_KEY_EXISTS");
+  const permissions = [...new Set(input.permissions)];
   await inPostgresTransaction(async (transaction) => {
+    let existing: GrantRole | undefined;
+    if (input.id) {
+      const locked = await transaction<
+        { id: string; isSystem: boolean }[]
+      >`SELECT id, is_system AS "isSystem" FROM roles WHERE id = ${id} FOR UPDATE`;
+      if (locked[0]) {
+        const permissionRows = await transaction<
+          { permission_key: string }[]
+        >`SELECT permission_key FROM role_permissions WHERE role_id = ${id}`;
+        existing = {
+          id: locked[0].id,
+          isSystem: locked[0].isSystem,
+          permissions: permissionRows.map((row) => row.permission_key),
+        };
+      }
+    }
+    assertCanSaveRole(actor(context), { id, existing, permissions });
+    const duplicate =
+      await transaction`SELECT id FROM roles WHERE key = ${key} AND id <> ${id} FOR UPDATE`;
+    if (duplicate.length) throw new Error("ROLE_KEY_EXISTS");
     await transaction`INSERT INTO roles (id, key, name, description) VALUES (${id}, ${key}, ${input.name.trim()}, ${input.description?.trim() ?? ""}) ON CONFLICT (id) DO UPDATE SET key = EXCLUDED.key, name = EXCLUDED.name, description = EXCLUDED.description`;
     await transaction`DELETE FROM role_permissions WHERE role_id = ${id}`;
-    for (const permission of [...new Set(input.permissions)])
+    for (const permission of permissions)
       await transaction`INSERT INTO role_permissions (role_id, permission_key) VALUES (${id}, ${permission})`;
   });
   return id;

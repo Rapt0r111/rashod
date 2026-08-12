@@ -21,7 +21,10 @@ const roleSchema = z.object({
   key: z.string().trim().min(3).max(64),
   name: shortText(120),
   description: optionalText(500),
-  permissions: uniqueArray(z.enum(PERMISSIONS), PERMISSIONS.length),
+  permissions: uniqueArray(z.enum(PERMISSIONS), PERMISSIONS.length).refine(
+    (items) => items.length > 0,
+    "ROLE_PERMISSIONS_REQUIRED",
+  ),
 });
 
 export async function GET(request: Request) {

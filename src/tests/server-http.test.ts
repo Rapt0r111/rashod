@@ -66,6 +66,8 @@ describe("server HTTP contract", () => {
     ["LOCATION_NOT_FOUND", 404],
     ["GROUP_ASSIGNMENT_INELIGIBLE", 409],
     ["PAYLOAD_TOO_LARGE", 413],
+    ["ROLE_PERMISSIONS_REQUIRED", 400],
+    ["ROLE_GRANT_FORBIDDEN", 403],
   ])("maps %s", async (code, status) => {
     expect(apiError(new Error(code)).status).toBe(status);
   });
