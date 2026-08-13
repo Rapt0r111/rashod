@@ -1,40 +1,142 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-07-29",
+  "generatedAt": "2026-08-13T00:00:00.000Z",
   "title": "Design System: Rashod",
   "extensions": {
     "colorMeta": {
       "bg-base": {
         "role": "neutral",
         "displayName": "Indigo Night",
-        "canonical": "oklch(13% 0.036 286)",
+        "canonical": "oklch(13% 0.028 286)",
         "tonalRamp": [
-          "oklch(9% 0.03 286)",
-          "oklch(13% 0.036 286)",
-          "oklch(17% 0.038 286)",
-          "oklch(21% 0.042 286)"
+          "oklch(15% 0.028 286)",
+          "oklch(26% 0.028 286)",
+          "oklch(38% 0.028 286)",
+          "oklch(49% 0.028 286)",
+          "oklch(61% 0.028 286)",
+          "oklch(72% 0.028 286)",
+          "oklch(84% 0.028 286)",
+          "oklch(95% 0.028 286)"
         ]
       },
       "bg-panel": {
         "role": "neutral",
         "displayName": "Panel Indigo",
-        "canonical": "oklch(17% 0.038 286 / 0.88)",
+        "canonical": "oklch(16.5% 0.03 286)",
         "tonalRamp": [
-          "oklch(13% 0.036 286)",
-          "oklch(17% 0.038 286)",
-          "oklch(21% 0.042 286)",
-          "oklch(25% 0.045 286)"
+          "oklch(15% 0.03 286)",
+          "oklch(26% 0.03 286)",
+          "oklch(38% 0.03 286)",
+          "oklch(49% 0.03 286)",
+          "oklch(61% 0.03 286)",
+          "oklch(72% 0.03 286)",
+          "oklch(84% 0.03 286)",
+          "oklch(95% 0.03 286)"
         ]
       },
       "bg-raised": {
         "role": "neutral",
         "displayName": "Raised Indigo",
-        "canonical": "oklch(21% 0.042 286 / 0.82)",
+        "canonical": "oklch(19.5% 0.032 286)",
         "tonalRamp": [
-          "oklch(17% 0.038 286)",
-          "oklch(21% 0.042 286)",
-          "oklch(25% 0.045 286)",
-          "oklch(29% 0.048 286)"
+          "oklch(15% 0.032 286)",
+          "oklch(26% 0.032 286)",
+          "oklch(38% 0.032 286)",
+          "oklch(49% 0.032 286)",
+          "oklch(61% 0.032 286)",
+          "oklch(72% 0.032 286)",
+          "oklch(84% 0.032 286)",
+          "oklch(95% 0.032 286)"
+        ]
+      },
+      "bg-overlay": {
+        "role": "neutral",
+        "displayName": "Overlay Indigo",
+        "canonical": "oklch(9% 0.024 286 / 0.78)",
+        "tonalRamp": [
+          "oklch(15% 0.024 286)",
+          "oklch(26% 0.024 286)",
+          "oklch(38% 0.024 286)",
+          "oklch(49% 0.024 286)",
+          "oklch(61% 0.024 286)",
+          "oklch(72% 0.024 286)",
+          "oklch(84% 0.024 286)",
+          "oklch(95% 0.024 286)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Quiet Line",
+        "canonical": "oklch(82% 0.04 286 / 0.12)",
+        "tonalRamp": [
+          "oklch(15% 0.04 286)",
+          "oklch(26% 0.04 286)",
+          "oklch(38% 0.04 286)",
+          "oklch(49% 0.04 286)",
+          "oklch(61% 0.04 286)",
+          "oklch(72% 0.04 286)",
+          "oklch(84% 0.04 286)",
+          "oklch(95% 0.04 286)"
+        ]
+      },
+      "line-strong": {
+        "role": "neutral",
+        "displayName": "Strong Line",
+        "canonical": "oklch(82% 0.05 286 / 0.24)",
+        "tonalRamp": [
+          "oklch(15% 0.05 286)",
+          "oklch(26% 0.05 286)",
+          "oklch(38% 0.05 286)",
+          "oklch(49% 0.05 286)",
+          "oklch(61% 0.05 286)",
+          "oklch(72% 0.05 286)",
+          "oklch(84% 0.05 286)",
+          "oklch(95% 0.05 286)"
+        ]
+      },
+      "text-primary": {
+        "role": "neutral",
+        "displayName": "Primary Text",
+        "canonical": "oklch(94% 0.01 286)",
+        "tonalRamp": [
+          "oklch(15% 0.01 286)",
+          "oklch(26% 0.01 286)",
+          "oklch(38% 0.01 286)",
+          "oklch(49% 0.01 286)",
+          "oklch(61% 0.01 286)",
+          "oklch(72% 0.01 286)",
+          "oklch(84% 0.01 286)",
+          "oklch(95% 0.01 286)"
+        ]
+      },
+      "text-secondary": {
+        "role": "neutral",
+        "displayName": "Secondary Text",
+        "canonical": "oklch(76% 0.025 286)",
+        "tonalRamp": [
+          "oklch(15% 0.025 286)",
+          "oklch(26% 0.025 286)",
+          "oklch(38% 0.025 286)",
+          "oklch(49% 0.025 286)",
+          "oklch(61% 0.025 286)",
+          "oklch(72% 0.025 286)",
+          "oklch(84% 0.025 286)",
+          "oklch(95% 0.025 286)"
+        ]
+      },
+      "text-muted": {
+        "role": "neutral",
+        "displayName": "Muted Text",
+        "canonical": "oklch(60% 0.026 286)",
+        "tonalRamp": [
+          "oklch(15% 0.026 286)",
+          "oklch(26% 0.026 286)",
+          "oklch(38% 0.026 286)",
+          "oklch(49% 0.026 286)",
+          "oklch(61% 0.026 286)",
+          "oklch(72% 0.026 286)",
+          "oklch(84% 0.026 286)",
+          "oklch(95% 0.026 286)"
         ]
       },
       "primary": {
@@ -42,10 +144,44 @@
         "displayName": "Command Orchid",
         "canonical": "oklch(68% 0.19 302)",
         "tonalRamp": [
-          "oklch(48% 0.16 302)",
-          "oklch(58% 0.18 302)",
-          "oklch(68% 0.19 302)",
-          "oklch(78% 0.16 302)"
+          "oklch(15% 0.19 302)",
+          "oklch(26% 0.19 302)",
+          "oklch(38% 0.19 302)",
+          "oklch(49% 0.19 302)",
+          "oklch(61% 0.19 302)",
+          "oklch(72% 0.19 302)",
+          "oklch(84% 0.19 302)",
+          "oklch(95% 0.19 302)"
+        ]
+      },
+      "primary-soft": {
+        "role": "primary",
+        "displayName": "Command Orchid Soft",
+        "canonical": "oklch(68% 0.19 302 / 0.14)",
+        "tonalRamp": [
+          "oklch(15% 0.19 302)",
+          "oklch(26% 0.19 302)",
+          "oklch(38% 0.19 302)",
+          "oklch(49% 0.19 302)",
+          "oklch(61% 0.19 302)",
+          "oklch(72% 0.19 302)",
+          "oklch(84% 0.19 302)",
+          "oklch(95% 0.19 302)"
+        ]
+      },
+      "primary-line": {
+        "role": "primary",
+        "displayName": "Command Orchid Line",
+        "canonical": "oklch(68% 0.19 302 / 0.32)",
+        "tonalRamp": [
+          "oklch(15% 0.19 302)",
+          "oklch(26% 0.19 302)",
+          "oklch(38% 0.19 302)",
+          "oklch(49% 0.19 302)",
+          "oklch(61% 0.19 302)",
+          "oklch(72% 0.19 302)",
+          "oklch(84% 0.19 302)",
+          "oklch(95% 0.19 302)"
         ]
       },
       "cyan": {
@@ -53,77 +189,212 @@
         "displayName": "Operational Cyan",
         "canonical": "oklch(77% 0.14 191)",
         "tonalRamp": [
-          "oklch(57% 0.12 191)",
-          "oklch(67% 0.14 191)",
-          "oklch(77% 0.14 191)",
-          "oklch(87% 0.1 191)"
+          "oklch(15% 0.14 191)",
+          "oklch(26% 0.14 191)",
+          "oklch(38% 0.14 191)",
+          "oklch(49% 0.14 191)",
+          "oklch(61% 0.14 191)",
+          "oklch(72% 0.14 191)",
+          "oklch(84% 0.14 191)",
+          "oklch(95% 0.14 191)"
         ]
       },
-      "line": {
-        "role": "neutral",
-        "displayName": "Quiet Line",
-        "canonical": "oklch(82% 0.06 286 / 0.14)",
+      "green": {
+        "role": "tertiary",
+        "displayName": "Status Green",
+        "canonical": "oklch(76% 0.17 151)",
         "tonalRamp": [
-          "oklch(82% 0.06 286 / 0.08)",
-          "oklch(82% 0.06 286 / 0.14)",
-          "oklch(82% 0.08 286 / 0.28)"
+          "oklch(15% 0.17 151)",
+          "oklch(26% 0.17 151)",
+          "oklch(38% 0.17 151)",
+          "oklch(49% 0.17 151)",
+          "oklch(61% 0.17 151)",
+          "oklch(72% 0.17 151)",
+          "oklch(84% 0.17 151)",
+          "oklch(95% 0.17 151)"
+        ]
+      },
+      "blue": {
+        "role": "tertiary",
+        "displayName": "Status Blue",
+        "canonical": "oklch(72% 0.15 242)",
+        "tonalRamp": [
+          "oklch(15% 0.15 242)",
+          "oklch(26% 0.15 242)",
+          "oklch(38% 0.15 242)",
+          "oklch(49% 0.15 242)",
+          "oklch(61% 0.15 242)",
+          "oklch(72% 0.15 242)",
+          "oklch(84% 0.15 242)",
+          "oklch(95% 0.15 242)"
+        ]
+      },
+      "amber": {
+        "role": "tertiary",
+        "displayName": "Status Amber",
+        "canonical": "oklch(78% 0.16 74)",
+        "tonalRamp": [
+          "oklch(15% 0.16 74)",
+          "oklch(26% 0.16 74)",
+          "oklch(38% 0.16 74)",
+          "oklch(49% 0.16 74)",
+          "oklch(61% 0.16 74)",
+          "oklch(72% 0.16 74)",
+          "oklch(84% 0.16 74)",
+          "oklch(95% 0.16 74)"
+        ]
+      },
+      "red": {
+        "role": "tertiary",
+        "displayName": "Status Red",
+        "canonical": "oklch(69% 0.18 28)",
+        "tonalRamp": [
+          "oklch(15% 0.18 28)",
+          "oklch(26% 0.18 28)",
+          "oklch(38% 0.18 28)",
+          "oklch(49% 0.18 28)",
+          "oklch(61% 0.18 28)",
+          "oklch(72% 0.18 28)",
+          "oklch(84% 0.18 28)",
+          "oklch(95% 0.18 28)"
+        ]
+      },
+      "violet": {
+        "role": "tertiary",
+        "displayName": "Status Violet",
+        "canonical": "oklch(72% 0.18 302)",
+        "tonalRamp": [
+          "oklch(15% 0.18 302)",
+          "oklch(26% 0.18 302)",
+          "oklch(38% 0.18 302)",
+          "oklch(49% 0.18 302)",
+          "oklch(61% 0.18 302)",
+          "oklch(72% 0.18 302)",
+          "oklch(84% 0.18 302)",
+          "oklch(95% 0.18 302)"
+        ]
+      },
+      "neutral": {
+        "role": "tertiary",
+        "displayName": "Status Neutral",
+        "canonical": "oklch(75% 0.025 286)",
+        "tonalRamp": [
+          "oklch(15% 0.025 286)",
+          "oklch(26% 0.025 286)",
+          "oklch(38% 0.025 286)",
+          "oklch(49% 0.025 286)",
+          "oklch(61% 0.025 286)",
+          "oklch(72% 0.025 286)",
+          "oklch(84% 0.025 286)",
+          "oklch(95% 0.025 286)"
+        ]
+      },
+      "ink-on-accent": {
+        "role": "neutral",
+        "displayName": "Ink on Accent",
+        "canonical": "oklch(12% 0.04 286)",
+        "tonalRamp": [
+          "oklch(15% 0.04 286)",
+          "oklch(26% 0.04 286)",
+          "oklch(38% 0.04 286)",
+          "oklch(49% 0.04 286)",
+          "oklch(61% 0.04 286)",
+          "oklch(72% 0.04 286)",
+          "oklch(84% 0.04 286)",
+          "oklch(95% 0.04 286)"
         ]
       }
     },
     "typographyMeta": {
       "display": {
-        "displayName": "Operational Display",
-        "purpose": "Large workspace headings only; never marketing hero copy."
+        "displayName": "Command Count",
+        "purpose": "Large mono readout on command chips and task totals."
+      },
+      "headline": {
+        "displayName": "Module Title",
+        "purpose": "Page titles for tasks, portal and similar workspaces."
+      },
+      "title": {
+        "displayName": "Panel Title",
+        "purpose": "Login, module cards and drawer headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Working copy, field values and roster names."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Chip captions, button labels and quiet chrome."
       },
       "mono": {
         "displayName": "Readout Mono",
-        "purpose": "Aligned time, counts and operational values."
+        "purpose": "Clock and compact aligned counts."
       }
     },
     "shadows": [
       {
-        "name": "ambient-app-surface",
-        "value": "0 12px 30px rgb(0 0 0 / 0.28), inset 0 1px 0 rgb(255 255 255 / 0.05)",
-        "purpose": "Large app-level surfaces and panels."
+        "name": "app-surface",
+        "value": "0 16px 40px rgb(0 0 0 / 0.32), inset 0 1px 0 rgb(255 255 255 / 0.04)",
+        "purpose": "Isolated empty/error app panels using --shadow."
       },
       {
-        "name": "operator-surface",
-        "value": "0 14px 34px rgb(0 0 0 / 0.2)",
-        "purpose": "Sticky operator bar above scrollable roster data."
-      },
-      {
-        "name": "overlay-surface",
+        "name": "drawer",
         "value": "30px 0 90px rgb(0 0 0 / 0.42)",
-        "purpose": "Section drawer and large overlay panels."
+        "purpose": "Section drawer overlay."
+      },
+      {
+        "name": "dialog",
+        "value": "0 30px 90px rgb(0 0 0 / 0.55)",
+        "purpose": "History and location sheets."
+      },
+      {
+        "name": "listbox",
+        "value": "0 18px 52px rgb(0 0 0 / 0.45), inset 0 1px 0 rgb(255 255 255 / 0.06)",
+        "purpose": "Custom SelectField popup."
+      },
+      {
+        "name": "focus-halo",
+        "value": "0 0 0 3px color-mix(in oklch, var(--cyan) 22%, transparent)",
+        "purpose": "Field and ZGT control focus."
       }
     ],
     "motion": [
       {
         "name": "state-transition",
-        "value": "200ms ease-out",
-        "purpose": "Border, background, color and transform state changes."
+        "value": "150ms–200ms ease",
+        "purpose": "Border, background, color and press offset."
       },
       {
         "name": "loader",
         "value": "2.5s infinite",
-        "purpose": "Loading-only state; collapse to near-instant under prefers-reduced-motion."
+        "purpose": "Loading-only; collapse under prefers-reduced-motion."
       }
     ],
     "breakpoints": [
       {
+        "name": "wide-shell",
+        "value": "1180px",
+        "purpose": "Tighten top-bar and sidebar padding."
+      },
+      {
+        "name": "clock",
+        "value": "1100px",
+        "purpose": "Hide live clock in the top bar."
+      },
+      {
         "name": "tablet-shell",
         "value": "900px",
-        "purpose": "Collapse desktop sidebar and expose the section drawer."
+        "purpose": "Collapse sidebar into drawer and section chips."
+      },
+      {
+        "name": "module-icons",
+        "value": "720px",
+        "purpose": "Collapse module links to icon buttons."
       },
       {
         "name": "compact-tablet",
         "value": "560px",
-        "purpose": "Compact brand copy and preserve icon-sized actions."
-      },
-      {
-        "name": "wide-shell",
-        "value": "1180px",
-        "purpose": "Reduce sidebar and top-bar density."
+        "purpose": "Brand mark only; roster row stacks."
       }
     ]
   },
@@ -132,94 +403,142 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "The main commit action in a form or operational flow.",
-      "html": "<button class=\"ds-btn-primary\" type=\"button\">Назначить</button>",
-      "css": ".ds-btn-primary { min-height: 42px; padding: 0 16px; border: 1px solid var(--accent-line); border-radius: var(--radius-control); background: var(--accent); color: oklch(12% 0.04 286); font: 600 12px/1.35 var(--font-geist-sans), system-ui, sans-serif; transition: background 200ms ease-out, border-color 200ms ease-out, transform 200ms ease-out; } .ds-btn-primary:hover { background: color-mix(in oklch, var(--accent) 88%, white 12%); } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }"
+      "description": "Solid orchid commit on login and brand-critical actions.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\">Войти</button>",
+      "css": ".ds-btn-primary { min-height: 42px; padding: 0 16px; border: 1px solid var(--accent-line); border-radius: var(--radius-control); background: var(--accent); color: oklch(12% 0.04 286); font: 600 14px/1.35 var(--font-geist-sans), system-ui, sans-serif; transition: filter 150ms ease, opacity 150ms ease; } .ds-btn-primary:hover { filter: brightness(1.1); } .ds-btn-primary:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; } .ds-btn-primary:disabled { opacity: 0.52; cursor: not-allowed; }"
+    },
+    {
+      "name": "Soft Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary-soft",
+      "description": "In-app primary used by ZGT forms.",
+      "html": "<button class=\"ds-btn-primary-soft\" type=\"button\">Сохранить</button>",
+      "css": ".ds-btn-primary-soft { min-height: 42px; padding: 0 14px; border: 1px solid var(--accent-line); border-radius: var(--radius-control); background: var(--accent-soft); color: var(--text-primary); font: 600 14px/1.35 var(--font-geist-sans), system-ui, sans-serif; transition: background-color 150ms ease, border-color 150ms ease; } .ds-btn-primary-soft:hover { background: color-mix(in oklch, var(--accent) 22%, transparent); } .ds-btn-primary-soft:focus-visible { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 3px color-mix(in oklch, var(--cyan) 22%, transparent); }"
     },
     {
       "name": "Secondary Button",
       "kind": "button",
       "refersTo": "button-secondary",
-      "description": "A quiet alternative action that stays available without competing with the commit action.",
-      "html": "<button class=\"ds-btn-secondary\" type=\"button\">Открыть журнал</button>",
-      "css": ".ds-btn-secondary { min-height: 42px; padding: 0 16px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg-raised); color: var(--text-primary); font: 600 12px/1.35 var(--font-geist-sans), system-ui, sans-serif; transition: background 200ms ease-out, border-color 200ms ease-out, color 200ms ease-out; } .ds-btn-secondary:hover { border-color: var(--line-strong); background: color-mix(in oklch, var(--bg-raised) 88%, white 12%); } .ds-btn-secondary:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }"
+      "description": "Quiet raised action that stays below the orchid commit.",
+      "html": "<button class=\"ds-btn-secondary\" type=\"button\">Модули</button>",
+      "css": ".ds-btn-secondary { min-height: 42px; padding: 0 16px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg-raised); color: var(--text-secondary); font: 600 12px/1.35 var(--font-geist-sans), system-ui, sans-serif; transition: border-color 200ms ease, color 200ms ease; } .ds-btn-secondary:hover { border-color: var(--line-strong); color: var(--text-primary); } .ds-btn-secondary:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }"
     },
     {
       "name": "Search Field",
       "kind": "input",
       "refersTo": "input-field",
-      "description": "A compact search field used beside roster filters and sorting.",
-      "html": "<label class=\"ds-search\"><span class=\"ds-search-icon\" aria-hidden=\"true\">⌕</span><input type=\"search\" placeholder=\"Найти человека\" /></label>",
-      "css": ".ds-search { display: flex; min-height: 42px; align-items: center; gap: 8px; min-width: 240px; padding: 0 10px; border: 1px solid var(--line); border-radius: 11px; background: color-mix(in oklch, var(--bg-base) 94%, white 6%); color: var(--text-muted); transition: border-color 200ms ease-out, box-shadow 200ms ease-out; } .ds-search:focus-within { border-color: var(--primary-line); box-shadow: 0 0 0 3px var(--primary-soft); } .ds-search input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; color: var(--text-primary); font: 400 14px/1.45 var(--font-geist-sans), system-ui, sans-serif; } .ds-search input::placeholder { color: var(--text-muted); } .ds-search-icon { color: var(--text-muted); font-size: 20px; }"
+      "description": "42px raised search under the command strip.",
+      "html": "<label class=\"ds-search\"><svg class=\"ds-search-icon\" width=\"17\" height=\"17\" viewBox=\"0 0 256 256\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M229.66 218.34l-50.07-50.06a88.11 88.11 0 1 0-11.31 11.31l50.06 50.07a8 8 0 0 0 11.32-11.32ZM40 112a72 72 0 1 1 72 72 72.08 72.08 0 0 1-72-72Z\"/></svg><input type=\"search\" placeholder=\"Найти человека по ФИО, званию или номеру призыва\" /></label>",
+      "css": ".ds-search { display: flex; min-height: 42px; align-items: center; gap: 8px; width: 100%; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg-raised); color: var(--text-muted); transition: border-color 200ms ease, box-shadow 200ms ease; } .ds-search:focus-within { border-color: var(--cyan); box-shadow: 0 0 0 3px color-mix(in oklch, var(--cyan) 22%, transparent); } .ds-search input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; color: var(--text-primary); font: 400 14px/1.45 var(--font-geist-sans), system-ui, sans-serif; } .ds-search input::placeholder { color: var(--text-muted); } .ds-search-icon { flex: 0 0 auto; color: var(--text-muted); }"
     },
     {
       "name": "Custom Select Trigger",
       "kind": "input",
       "refersTo": "input-field",
-      "description": "The trigger for a keyboard-navigable custom listbox, not a native select.",
-      "html": "<button class=\"ds-select\" type=\"button\" aria-haspopup=\"listbox\" aria-expanded=\"false\"><span>По алфавиту</span><span aria-hidden=\"true\">⌄</span></button>",
-      "css": ".ds-select { display: flex; min-height: 42px; width: 180px; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg-raised); color: var(--text-primary); font: 600 12px/1.35 var(--font-geist-sans), system-ui, sans-serif; transition: border-color 200ms ease-out, background 200ms ease-out; } .ds-select:hover, .ds-select[aria-expanded=\"true\"] { border-color: color-mix(in oklch, var(--cyan) 52%, transparent); background: color-mix(in oklch, var(--cyan) 9%, var(--bg-raised)); } .ds-select:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }"
+      "description": "Keyboard listbox trigger; never a native select.",
+      "html": "<button class=\"ds-select\" type=\"button\" aria-haspopup=\"listbox\" aria-expanded=\"false\"><span>А–Я</span><svg width=\"16\" height=\"16\" viewBox=\"0 0 256 256\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"m213.66 101.66-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32Z\"/></svg></button>",
+      "css": ".ds-select { display: flex; min-height: 42px; width: 180px; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-raised); color: var(--text-primary); font: 600 12px/1.35 var(--font-geist-sans), system-ui, sans-serif; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.055); transition: border-color 200ms ease, background 200ms ease; } .ds-select:hover, .ds-select[aria-expanded=\"true\"] { border-color: oklch(77% 0.14 191 / 0.52); } .ds-select[aria-expanded=\"true\"] { background: oklch(77% 0.14 191 / 0.09); } .ds-select:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }"
     },
     {
       "name": "Active Navigation Item",
       "kind": "nav",
       "refersTo": "nav-active",
-      "description": "The current section state in the desktop sidebar or mobile drawer.",
-      "html": "<button class=\"ds-nav-active\" type=\"button\" aria-current=\"page\"><span aria-hidden=\"true\">●</span><span>Весь состав</span><strong>42</strong></button>",
-      "css": ".ds-nav-active { display: grid; min-height: 42px; width: 100%; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 0 8px; border: 1px solid color-mix(in oklch, var(--cyan) 32%, transparent); border-radius: 13px; background: color-mix(in oklch, var(--cyan) 12%, transparent); color: var(--cyan); text-align: left; font: 600 12px/1.35 var(--font-geist-sans), system-ui, sans-serif; } .ds-nav-active strong { color: var(--text-muted); font: 700 11px/1.2 var(--font-geist-mono), monospace; } .ds-nav-active:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }"
+      "description": "Current roster section: raised surface, cyan type.",
+      "html": "<button class=\"ds-nav-active\" type=\"button\" aria-current=\"page\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 256 256\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M244.8 150.4a8 8 0 0 1-11.2-1.6A51.6 51.6 0 0 0 192 128a8 8 0 0 1 0-16 24 24 0 1 0-23.24-30 8 8 0 1 1-15.5-4A40 40 0 1 1 219 117.51a67.94 67.94 0 0 1 27.43 21.68 8 8 0 0 1-1.63 11.21ZM190.92 212a8 8 0 1 1-13.85 8 57 57 0 0 0-98.15 0 8 8 0 1 1-13.84-8 72.06 72.06 0 0 1 33.74-29.92 48 48 0 1 1 58.36 0A72.06 72.06 0 0 1 190.92 212ZM128 176a32 32 0 1 0-32-32 32 32 0 0 0 32 32Z\"/></svg><span>Весь состав</span><strong>42</strong></button>",
+      "css": ".ds-nav-active { display: grid; min-height: 42px; width: 100%; grid-template-columns: 20px minmax(0, 1fr) 42px; align-items: center; gap: 8px; padding: 0 8px; border: 1px solid transparent; border-radius: var(--radius-control); background: var(--bg-raised); color: var(--cyan); text-align: left; font: 400 14px/1.35 var(--font-geist-sans), system-ui, sans-serif; } .ds-nav-active strong { width: 42px; justify-self: end; border-radius: 999px; background: rgb(255 255 255 / 0.06); color: var(--text-muted); font: 700 11px/1.2 var(--font-geist-mono), Consolas, monospace; text-align: center; padding: 2px 6px; } .ds-nav-active:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }"
     },
     {
-      "name": "Summary Chip",
+      "name": "Command Chip",
       "kind": "chip",
-      "refersTo": "summary-chip",
-      "description": "A compact readout for totals, rota counts and secondary metrics.",
-      "html": "<div class=\"ds-summary\"><strong>42</strong><span>всего</span></div>",
-      "css": ".ds-summary { display: inline-grid; min-width: 68px; gap: 2px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 13px; background: color-mix(in oklch, var(--bg-raised) 82%, transparent); } .ds-summary strong { color: var(--text-primary); font: 700 16px/1 var(--font-geist-mono), monospace; } .ds-summary span { color: var(--text-muted); font: 600 11px/1.35 var(--font-geist-sans), system-ui, sans-serif; }"
+      "refersTo": "command-chip",
+      "description": "Location count: large mono number over a 12px label.",
+      "html": "<button class=\"ds-command-chip\" type=\"button\"><strong>18</strong><span>Казарма</span></button>",
+      "css": ".ds-command-chip { display: flex; min-height: 44px; min-width: 116px; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg-panel); text-align: left; transition: border-color 200ms ease, transform 200ms ease; } .ds-command-chip strong { color: var(--cyan); font: 700 28px/1 var(--font-geist-mono), Consolas, monospace; letter-spacing: -0.04em; } .ds-command-chip span { color: var(--text-secondary); font: 600 12px/1.35 var(--font-geist-sans), system-ui, sans-serif; } .ds-command-chip:hover { border-color: var(--line-strong); } .ds-command-chip:active { transform: translateY(1px); } .ds-command-chip:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg-base), 0 0 0 4px var(--cyan); }"
+    },
+    {
+      "name": "Selected Total Chip",
+      "kind": "chip",
+      "refersTo": "command-chip-selected",
+      "description": "The one orchid chip: roster total that resets filters.",
+      "html": "<button class=\"ds-command-chip-selected\" type=\"button\"><strong>42</strong><span>список</span></button>",
+      "css": ".ds-command-chip-selected { display: flex; min-height: 44px; min-width: 116px; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 10px 12px; border: 1px solid var(--accent-line); border-radius: var(--radius-control); background: var(--accent-soft); text-align: left; transition: border-color 200ms ease, transform 200ms ease; } .ds-command-chip-selected strong { color: var(--accent); font: 700 28px/1 var(--font-geist-mono), Consolas, monospace; letter-spacing: -0.04em; } .ds-command-chip-selected span { color: var(--text-secondary); font: 600 12px/1.35 var(--font-geist-sans), system-ui, sans-serif; } .ds-command-chip-selected:active { transform: translateY(1px); } .ds-command-chip-selected:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg-base), 0 0 0 4px var(--cyan); }"
     },
     {
       "name": "Operator Bar",
       "kind": "custom",
-      "refersTo": "summary-chip",
-      "description": "Tablet-first sticky surface combining location readouts and roster search.",
-      "html": "<section class=\"ds-operator\" aria-label=\"Оперативная панель\"><div class=\"ds-operator-row\"><span class=\"ds-summary ds-summary-accent\"><strong>42</strong><span>всего</span></span><span class=\"ds-location\">Казарма <b>18</b></span><span class=\"ds-location\">Госпиталь <b>3</b></span></div><label class=\"ds-search\"><span class=\"ds-search-icon\" aria-hidden=\"true\">⌕</span><input type=\"search\" placeholder=\"Найти человека\" /></label></section>",
-      "css": ".ds-operator { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 16px; background: color-mix(in oklch, var(--bg-base) 94%, transparent); box-shadow: 0 14px 34px rgb(0 0 0 / 0.2); } .ds-operator-row { display: flex; min-width: 0; gap: 8px; overflow-x: auto; padding-bottom: 2px; } .ds-summary-accent { border-color: var(--primary-line); background: var(--primary-soft); } .ds-summary-accent strong { color: var(--primary); } .ds-location { display: inline-flex; min-height: 42px; flex: 0 0 auto; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid var(--line); border-radius: 13px; background: color-mix(in oklch, var(--bg-raised) 80%, transparent); color: var(--text-primary); font: 600 12px/1.35 var(--font-geist-sans), system-ui, sans-serif; } .ds-location b { color: var(--cyan); font: 700 14px/1.2 var(--font-geist-mono), monospace; }"
+      "refersTo": "command-chip-selected",
+      "description": "Scrollable command strip of counts with search directly beneath; not sticky.",
+      "html": "<section class=\"ds-operator\" aria-label=\"Оперативная панель личного состава\"><div class=\"ds-operator-row\"><button class=\"ds-command-chip-selected\" type=\"button\"><strong>42</strong><span>список</span></button><button class=\"ds-command-chip\" type=\"button\"><strong>18</strong><span>Казарма</span></button><button class=\"ds-command-chip\" type=\"button\"><strong>3</strong><span>Госпиталь</span></button></div><label class=\"ds-search\"><svg class=\"ds-search-icon\" width=\"17\" height=\"17\" viewBox=\"0 0 256 256\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M229.66 218.34l-50.07-50.06a88.11 88.11 0 1 0-11.31 11.31l50.06 50.07a8 8 0 0 0 11.32-11.32ZM40 112a72 72 0 1 1 72 72 72.08 72.08 0 0 1-72-72Z\"/></svg><input type=\"search\" placeholder=\"Найти человека по ФИО, званию или номеру призыва\" /></label></section>",
+      "css": ".ds-operator { display: grid; min-width: 0; gap: 12px; } .ds-operator-row { display: grid; min-width: 0; grid-auto-flow: column; grid-auto-columns: minmax(7.25rem, 1fr); gap: 8px; overflow-x: auto; } .ds-command-chip { display: flex; min-height: 44px; min-width: 116px; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg-panel); text-align: left; } .ds-command-chip strong { color: var(--text-primary); font: 700 28px/1 var(--font-geist-mono), Consolas, monospace; letter-spacing: -0.04em; } .ds-command-chip span, .ds-command-chip-selected span { color: var(--text-secondary); font: 600 12px/1.35 var(--font-geist-sans), system-ui, sans-serif; } .ds-command-chip-selected { display: flex; min-height: 44px; min-width: 116px; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 10px 12px; border: 1px solid var(--accent-line); border-radius: var(--radius-control); background: var(--accent-soft); text-align: left; } .ds-command-chip-selected strong { color: var(--accent); font: 700 28px/1 var(--font-geist-mono), Consolas, monospace; letter-spacing: -0.04em; } .ds-search { display: flex; min-height: 42px; align-items: center; gap: 8px; width: 100%; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg-raised); color: var(--text-muted); } .ds-search input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; color: var(--text-primary); font: 400 14px/1.45 var(--font-geist-sans), system-ui, sans-serif; } .ds-search-icon { flex: 0 0 auto; }"
     }
   ],
   "narrative": {
-    "northStar": "Оперативный рабочий стол",
-    "overview": "Rashod — спокойный тёмный рабочий интерфейс для контроля и распределения личного состава. Он держит состояние и следующее действие рядом, чтобы оператор мог работать быстро и уверенно на desktop или планшете. Визуальная выразительность строится на точных слоях, семантическом цвете и согласованных controls, а не на игрушечной декоративности.",
+    "northStar": "Командная полоса дежурного",
+    "overview": "Rashod — тёмный командный стол дежурного. Сначала считываются количества по местам, затем фильтруется список, затем назначается человек — не покидая roster. Система отказывается от пустой роскоши и орнаментального стекла: панели непрозрачны, границы — hairline, orchid появляется только на выбранном итоге и на первичном действии.\n\nМир — глубокая индиго-ночь без зерна на холсте. Geist несёт русские подписи; Geist Mono держит крупные счётчики командных чипов. Контролы 42px. Cyan — фокус и активная навигация. Статусные green, blue, amber, red, violet и neutral помечают место и состояние, не украшают поверхность.\n\nКомпозиция: 64px верхняя панель, сайдбар 232px, в прокручиваемой колонке командная полоса, поиск и таблица roster. Полоса не липнет при прокрутке.",
     "keyCharacteristics": [
-      "Deep indigo workspace with restrained orchid accent",
-      "Cyan focus and operational attention",
-      "Dense but readable data-first layout",
-      "Touch-friendly 42px controls and tablet operator bar",
-      "Mono readouts for time, counts and aligned values"
+      "Непрозрачные индиго-панели и hairline-линии, без стеклянных заливок.",
+      "Orchid только на выбранном итоге и primary action; cyan — focus и active nav.",
+      "12px-подписи над крупными моно-счётчиками на командных чипах.",
+      "Единые 42px поля и кастомный listbox во всех разделах.",
+      "64px chrome, 232px сайдбар, перестройка в drawer на 900px."
     ],
     "rules": [
       {
-        "name": "The Operational Accent Rule",
-        "body": "Orchid and cyan communicate action, focus, selection or state; they are not decorative surface fills.",
+        "name": "The Orchid Rarity Rule",
+        "body": "Orchid занимает выбранный итог и primary action. Не заливать им навигацию, полосы и обычные карточки.",
         "section": "colors"
       },
       {
-        "name": "The Calm Hierarchy Rule",
-        "body": "Use measured type scale, weight and contrast instead of oversized display typography.",
+        "name": "The Cyan Attention Rule",
+        "body": "Cyan — focus ring и активный раздел, не второй brand-цвет и не заливка экрана.",
+        "section": "colors"
+      },
+      {
+        "name": "The Count-First Rule",
+        "body": "На командной полосе 12px-подпись стоит над крупным mono-числом. Не прятать количество в бейдж без цифры.",
         "section": "typography"
       },
       {
-        "name": "The Layered-By-Default Rule",
-        "body": "Use tonal surfaces and quiet lines before adding a shadow; reserve wide shadows for app-level surfaces.",
+        "name": "The Calm Hierarchy Rule",
+        "body": "Иерархия — вес, размер и контраст. Не вводить 42px+ display-заголовки: 42px в этой системе — высота контрола, не кегль.",
+        "section": "typography"
+      },
+      {
+        "name": "The Strip-Then-List Rule",
+        "body": "Счётчики мест, затем поиск, затем люди. Не уводить назначение в отдельный «красивый» экран.",
+        "section": "layout"
+      },
+      {
+        "name": "The Opaque Panel Rule",
+        "body": "Рабочие панели — сплошной --bg-panel / --bg-raised. Не делать command strip, строки и поля стеклянными.",
         "section": "elevation"
+      },
+      {
+        "name": "The Layered-By-Default Rule",
+        "body": "Сначала слой и линия; широкая тень — только у overlay и изолированных app-панелей, не у каждого чипа.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Control Radius Rule",
+        "body": "Поля, кнопки и командные чипы делят 10px. Не раздувать их до 22px+ и не делать обычный input капсулой.",
+        "section": "shapes"
       }
     ],
     "dos": [
-      "Do keep tablet controls touch-friendly and preserve visible focus.",
-      "Do reuse the shared custom listbox, search/sort and icon vocabulary."
+      "Do брать цвета, радиусы и `--control-height` из `:root` в `src/app/globals.css`.",
+      "Do ставить крупное mono-число над 12px-подписью на командной полосе и сводке задач.",
+      "Do красить orchid только выбранный итог и primary action; cyan — focus и active nav.",
+      "Do держать поля и основные кнопки на 42px и переиспользовать `SelectField`, `SearchSortControl`, `StyledCheckbox`.",
+      "Do оставлять панели непрозрачными и отделять их hairline, не blur.",
+      "Do проверять 900px и 560px: drawer, полоса, поиск, listbox, критические действия."
     ],
     "donts": [
-      "Don't make the interface look игрушечным.",
-      "Don't use gradient text, colored side stripes, repeating stripe backgrounds or sketchy illustrations.",
-      "Don't turn every ordinary control into a floating glass card."
+      "Don't делать интерфейс игрушечным: без мультяшности, декоративной перегрузки и эффектов ради эффектов.",
+      "Don't заливать экраны стеклом, широким blur или полупрозрачными рабочими панелями.",
+      "Don't ставить orchid на обычные nav-пункты, карточки модулей и невыбранные чипы мест.",
+      "Don't менять кастомный listbox и checkbox-chips на native `<select>` и видимые системные checkbox.",
+      "Don't вводить gradient text, цветные боковые полосы и 32px+ радиусы на полях.",
+      "Don't прятать roster за декоративной загрузкой и не добавлять motion, который задерживает действие."
     ]
   }
 }

@@ -4,7 +4,12 @@ import { SearchSortControl } from "@/components/search-sort-control";
 import type { LocationGroup, LocationOption, Person } from "../types";
 import { overviewLocationMetrics } from "../roster-metrics";
 import { cx } from "../utils";
-import { toneClasses } from "./person-views";
+
+function sameKeys(left: string[] | null | undefined, right: string[]) {
+  if (!left || left.length !== right.length) return false;
+  const wanted = new Set(right);
+  return left.every((key) => wanted.has(key));
+}
 
 export const OperatorBar = memo(function OperatorBar({
   people,
@@ -14,6 +19,7 @@ export const OperatorBar = memo(function OperatorBar({
   query,
   sort,
   error,
+  selectedLocationKeys,
   onQueryChange,
   onSortChange,
   onLocationFilter,
@@ -27,6 +33,7 @@ export const OperatorBar = memo(function OperatorBar({
   query: string;
   sort: ListSortState;
   error?: string | null;
+  selectedLocationKeys?: string[] | null;
   onQueryChange: (value: string) => void;
   onSortChange: (value: ListSortState) => void;
   onLocationFilter: (keys: string[]) => void;
@@ -44,49 +51,76 @@ export const OperatorBar = memo(function OperatorBar({
         ),
     [people, locations, locationGroups],
   );
+  const totalSelected = !selectedLocationKeys?.length;
 
   return (
     <section
-      className="mb-4 grid min-w-0 gap-2 rounded-2xl border border-line bg-[color-mix(in_oklch,var(--bg-base)_94%,transparent)] p-2.5 backdrop-blur-xl max-[900px]:top-17 max-[900px]:-mx-4 max-[900px]:rounded-none max-[900px]:border-x-0 max-[900px]:px-4"
+      className="grid min-w-0 gap-3 max-[900px]:top-17"
       aria-label="Оперативная панель личного состава"
     >
       <div
-        className="flex min-w-0 items-center gap-2 overflow-x-auto overscroll-x-contain pb-0.5"
+        className="grid min-w-0 auto-cols-[minmax(8rem,11rem)] grid-flow-col justify-start gap-2 overflow-x-auto overscroll-x-contain pb-0.5"
         aria-live="polite"
         aria-label="Распределение по местам"
       >
         <button
           type="button"
-          className="flex h-11 shrink-0 items-center gap-2 rounded-xl border border-accent-line bg-accent-soft px-3 transition duration-200 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base"
+          className={cx(
+            "flex min-h-11 min-w-29 flex-col items-start justify-between gap-1.5 rounded-[10px] border px-3 py-2.5 text-left transition-[border-color,background-color,transform] duration-200 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base",
+            totalSelected
+              ? "border-accent bg-accent"
+              : "border-line bg-bg-panel hover:border-line-strong",
+          )}
           title="Сбросить фильтры и показать весь список"
           aria-label={`Список ${total}. Сбросить фильтры`}
+          aria-pressed={totalSelected}
           onClick={onResetFilters}
         >
-          <strong className="font-mono text-lg leading-none text-accent">{total}</strong>
-          <span className="text-xs font-semibold text-text-secondary">список</span>
+          <span className={cx("text-xs font-semibold", totalSelected ? "text-[oklch(12%_0.04_286)]" : "text-text-secondary")}>
+            список
+          </span>
+          <strong
+            className={cx(
+              "font-mono text-[2.25rem] leading-none tracking-[-0.04em]",
+              totalSelected ? "text-[oklch(12%_0.04_286)]" : "text-text-primary",
+            )}
+          >
+            {total}
+          </strong>
         </button>
-        <span className="h-7 w-px shrink-0 bg-line" aria-hidden="true" />
         {distribution.map((item) => {
-          const tone = toneClasses(item.token);
+          const selected = sameKeys(selectedLocationKeys, item.locationKeys);
           return (
             <button
               key={item.key}
               type="button"
               className={cx(
-                "inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3 text-left transition-[background,border-color,color,transform] duration-200 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base",
-                tone.border,
-                tone.soft,
-                "hover:brightness-110",
+                "flex min-h-11 min-w-29 flex-col items-start justify-between gap-1.5 rounded-[10px] border px-3 py-2.5 text-left transition-[border-color,background-color,transform] duration-200 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base",
+                selected
+                  ? "border-accent bg-accent"
+                  : "border-line bg-bg-panel hover:border-line-strong",
               )}
               onClick={() => onLocationFilter(item.locationKeys)}
               aria-label={`Показать людей в месте: ${item.label}`}
+              aria-pressed={selected}
               title={`Показать людей в месте: ${item.label}`}
             >
-              <i className={cx("h-2 w-2 shrink-0 rounded-full", tone.bg)} aria-hidden="true" />
-              <span className="max-w-37.5 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-semibold text-text-primary">
+              <span
+                className={cx(
+                  "max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-xs font-semibold",
+                  selected ? "text-[oklch(12%_0.04_286)]" : "text-text-secondary",
+                )}
+              >
                 {item.label}
               </span>
-              <b className={cx("font-mono text-sm", tone.text)}>{item.count}</b>
+              <b
+                className={cx(
+                  "font-mono text-[2.25rem] leading-none tracking-[-0.04em]",
+                  selected ? "text-[oklch(12%_0.04_286)]" : "text-text-primary",
+                )}
+              >
+                {item.count}
+              </b>
             </button>
           );
         })}

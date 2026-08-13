@@ -647,7 +647,7 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
   );
 
   return (
-    <div className="relative z-1 isolate grid h-dvh w-full max-w-[100vw] grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-bg-base bg-[radial-gradient(circle_at_20%_-10%,oklch(32%_0.12_302/0.28),transparent_36%),radial-gradient(circle_at_86%_14%,oklch(34%_0.11_193/0.18),transparent_30%)]">
+    <div className="relative z-1 isolate flex h-dvh w-full max-w-[100vw] flex-col overflow-hidden bg-bg-base">
       <a className="fixed left-4 top-3 z-80 translate-y-[-150%] rounded-xl border border-accent-line bg-bg-panel px-3.5 py-2.5 text-text-primary focus:translate-y-0" href="#main-content">
         К основному содержимому
       </a>
@@ -667,7 +667,7 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
         onLogout={logout}
         onToggleFullscreen={toggleFullscreen}
       />
-      <div className="grid min-h-0 min-w-0 grid-cols-[232px_minmax(0,1fr)] max-[900px]:grid-cols-1">
+      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-[232px_minmax(0,1fr)] max-[900px]:grid-cols-1">
         <Sidebar
           people={state.people}
           counts={sectionCounts}
@@ -703,30 +703,33 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
               Доступ только для просмотра.
             </p>
           )}
-          {isRosterSection && (
-            <OperatorBar
-              people={operatorPeople}
-              total={state.people.length}
-              locations={sortedLocations}
-              locationGroups={state.locationGroups}
-              query={state.ui.searchQuery}
-              sort={state.ui.sort}
-              error={locationError}
-              onQueryChange={(value) => {
-                setLocationError(null);
-                dispatch({ type: "search", value });
-              }}
-              onSortChange={(value) => dispatch({ type: "sort", value })}
-              onLocationFilter={selectLocationFilters}
-              onResetFilters={() => {
-                setLocationError(null);
-                dispatch({ type: "search", value: "" });
-                dispatch({ type: "platoonFilter", value: null });
-                dispatch({ type: "locationFilter", value: null });
-                dispatch({ type: "conscriptionFilter", value: null });
-              }}
-            />
-          )}
+          {isRosterSection ? (
+            <div className="mb-4">
+              <OperatorBar
+                people={operatorPeople}
+                total={state.people.length}
+                locations={sortedLocations}
+                locationGroups={state.locationGroups}
+                query={state.ui.searchQuery}
+                sort={state.ui.sort}
+                error={locationError}
+                selectedLocationKeys={state.ui.locationFilterKeys}
+                onQueryChange={(value) => {
+                  setLocationError(null);
+                  dispatch({ type: "search", value });
+                }}
+                onSortChange={(value) => dispatch({ type: "sort", value })}
+                onLocationFilter={selectLocationFilters}
+                onResetFilters={() => {
+                  setLocationError(null);
+                  dispatch({ type: "search", value: "" });
+                  dispatch({ type: "platoonFilter", value: null });
+                  dispatch({ type: "locationFilter", value: null });
+                  dispatch({ type: "conscriptionFilter", value: null });
+                }}
+              />
+            </div>
+          ) : null}
           {state.ui.activeSection === "groups" && canReadGroups ? (
             groupsSnapshot ? (
               <GroupsApp initialSnapshot={groupsSnapshot} canWrite={canWriteGroups} />

@@ -153,7 +153,7 @@ export function AdminPanel({
   );
   if (layout === "page") {
     return (
-      <main ref={panelRef} className="h-dvh max-h-dvh min-h-0 overflow-y-auto overscroll-contain bg-bg-base bg-[radial-gradient(circle_at_15%_-10%,oklch(32%_0.12_302/0.22),transparent_36%),radial-gradient(circle_at_90%_8%,oklch(34%_0.11_193/0.16),transparent_30%)]">
+      <main ref={panelRef} className="h-dvh max-h-dvh min-h-0 overflow-y-auto overscroll-contain bg-bg-base">
         <div className="mx-auto grid min-h-dvh w-full max-w-360 content-start gap-6 px-6 py-6 max-[720px]:gap-4 max-[720px]:px-4 max-[720px]:py-4">
           <header className="flex min-w-0 items-start justify-between gap-5 rounded-3xl border border-line bg-bg-panel/75 px-6 py-5 max-[720px]:px-4 max-[720px]:py-4">
             <div className="min-w-0">

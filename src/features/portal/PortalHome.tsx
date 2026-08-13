@@ -23,9 +23,9 @@ export function PortalHome({
       <div className="grid gap-3 sm:grid-cols-2">
         {modules.map((module) => {
           const cardClass = cx(
-            "group relative flex min-h-44 flex-col rounded-[22px] border p-5 transition-[border-color,background-color] duration-150",
+            "group relative flex min-h-44 flex-col rounded-[12px] border p-5 transition-[border-color,background-color] duration-150",
             module.available
-              ? "border-line bg-bg-panel/80 hover:border-line-strong hover:bg-bg-raised/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base"
+              ? "border-line bg-bg-panel hover:border-line-strong hover:bg-bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base"
               : "border-line/60 bg-bg-panel/40 opacity-70",
           );
 
@@ -34,7 +34,7 @@ export function PortalHome({
               <div className="flex items-start justify-between gap-3">
                 <div
                   className={cx(
-                    "grid h-11 w-11 place-items-center rounded-2xl text-sm font-black",
+                    "grid h-11 w-11 place-items-center rounded-[10px] text-sm font-black",
                     module.id === "zgt"
                       ? "bg-[color-mix(in_oklch,var(--amber)_18%,transparent)] text-amber"
                       : "bg-[color-mix(in_oklch,var(--cyan)_16%,transparent)] text-cyan",

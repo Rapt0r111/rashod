@@ -32,16 +32,16 @@ export function TopBar(props: {
   const embedded = Boolean(props.embeddedInShell);
 
   return (
-    <header className="flex h-16 min-w-0 items-center gap-3 border-b border-line bg-[oklch(15%_0.04_286)] px-4.5 max-[1180px]:gap-2.5 max-[1180px]:px-3.5 max-[900px]:h-16 max-[900px]:min-h-16 max-[900px]:gap-2.5 max-[900px]:px-3.5 max-[560px]:gap-2 max-[560px]:px-2.5">
+    <header className="flex h-16 min-w-0 items-center gap-3 border-b border-line bg-bg-base px-4.5 max-[1180px]:gap-2.5 max-[1180px]:px-3.5 max-[900px]:h-16 max-[900px]:min-h-16 max-[900px]:gap-2.5 max-[900px]:px-3.5 max-[560px]:gap-2 max-[560px]:px-2.5">
       <div
         className="flex min-w-47 w-58 flex-[0_1_232px] items-center gap-3 max-[1180px]:min-w-46 max-[1180px]:basis-52 max-[900px]:min-w-29.5 max-[900px]:basis-37.5 max-[560px]:min-w-11 max-[560px]:basis-11"
         aria-label="Расход личного состава"
       >
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[13px] bg-[linear-gradient(135deg,var(--accent),var(--cyan))] font-extrabold text-[oklch(12%_0.04_286)]">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-accent font-extrabold text-[oklch(12%_0.04_286)]">
           ЛС
         </div>
         <div className="min-w-0 max-[560px]:hidden">
-          <div className="overflow-hidden text-ellipsis whitespace-nowrap font-bold">
+          <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[22px] font-bold leading-none tracking-[-0.03em]">
             Расход л/с
           </div>
           <div
@@ -61,7 +61,7 @@ export function TopBar(props: {
             <Link
               href="/zgt"
               prefetch
-              className="inline-flex min-h-[42px] shrink-0 items-center gap-2 rounded-[13px] border border-line bg-white/4 px-3 text-xs font-semibold text-text-secondary no-underline transition hover:border-[color-mix(in_oklch,var(--cyan)_34%,transparent)] hover:bg-[color-mix(in_oklch,var(--cyan)_12%,transparent)] hover:text-cyan"
+              className="inline-flex min-h-[42px] shrink-0 items-center gap-2 rounded-[10px] border border-line bg-bg-raised px-3 text-xs font-semibold text-text-secondary no-underline transition hover:border-line-strong hover:text-text-primary"
             >
               <DesktopTowerIcon size={16} weight="regular" aria-hidden />
               ЗГТ
@@ -70,7 +70,7 @@ export function TopBar(props: {
           <Link
             href="/portal"
             prefetch
-            className="inline-flex min-h-[42px] shrink-0 items-center gap-2 rounded-[13px] border border-line bg-white/4 px-3 text-xs font-semibold text-text-secondary no-underline transition hover:border-line-strong hover:text-text-primary"
+            className="inline-flex min-h-[42px] shrink-0 items-center gap-2 rounded-[10px] border border-line bg-bg-raised px-3 text-xs font-semibold text-text-secondary no-underline transition hover:border-line-strong hover:text-text-primary"
           >
             <SquaresFourIcon size={16} weight="regular" aria-hidden />
             Модули

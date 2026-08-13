@@ -98,17 +98,17 @@ function GroupsWorkspace({ initialSnapshot, canWrite }: { initialSnapshot: Group
 
   return (
     <main className="h-dvh min-h-0 min-w-0 overflow-y-auto overscroll-contain bg-bg-base">
-      <nav className="sticky top-0 z-20 flex gap-2 border-b border-line bg-bg-base/95 px-3 py-2 backdrop-blur md:px-4" aria-label="Разделы групп">
+      <nav className="sticky top-0 z-20 flex gap-1 border-b border-line bg-bg-base px-3 py-2 md:px-4" aria-label="Разделы групп">
         <button
           type="button"
-          className={`inline-flex min-h-[42px] items-center rounded-[13px] border px-3 text-sm font-semibold transition-[background-color,border-color,color] duration-150 ${view === "groups" ? "border-accent-line bg-accent-soft text-text-primary" : "border-line text-text-secondary hover:border-line-strong hover:text-text-primary"}`}
+          className={`inline-flex min-h-[42px] items-center rounded-[10px] border px-3 text-sm font-semibold transition-[background-color,border-color,color] duration-150 ${view === "groups" ? "border-accent-line bg-accent-soft text-text-primary" : "border-transparent text-text-secondary hover:bg-bg-raised hover:text-text-primary"}`}
           onClick={() => setView("groups")}
         >
           Группы
         </button>
         <button
           type="button"
-          className={`inline-flex min-h-[42px] items-center rounded-[13px] border px-3 text-sm font-semibold transition-[background-color,border-color,color] duration-150 ${view === "schedule" ? "border-accent-line bg-accent-soft text-text-primary" : "border-line text-text-secondary hover:border-line-strong hover:text-text-primary"}`}
+          className={`inline-flex min-h-[42px] items-center rounded-[10px] border px-3 text-sm font-semibold transition-[background-color,border-color,color] duration-150 ${view === "schedule" ? "border-accent-line bg-accent-soft text-text-primary" : "border-transparent text-text-secondary hover:bg-bg-raised hover:text-text-primary"}`}
           onClick={() => void openSchedule()}
         >
           График

@@ -1,6 +1,10 @@
 import Link from "next/link";
 import {
+  CalendarBlankIcon,
+  ChartPieSliceIcon,
+  CheckSquareIcon,
   ClockCounterClockwiseIcon,
+  FlagBannerIcon,
   DesktopTowerIcon,
   DownloadSimpleIcon,
   SignOutIcon,
@@ -15,6 +19,14 @@ import { SERVICE_SECTIONS } from "../constants";
 import { cx } from "../utils";
 
 export type SectionCounts = Partial<Record<string, number>>;
+
+const sectionIcons = {
+  overview: ChartPieSliceIcon,
+  all: UsersThreeIcon,
+  groups: FlagBannerIcon,
+  schedule: CalendarBlankIcon,
+  tasks: CheckSquareIcon,
+} as const;
 
 function formatCompactCount(value: number) {
   return value > 999 ? "999+" : String(value);
@@ -55,18 +67,20 @@ export function Sidebar({
 }) {
   const items = sectionItems(people, counts, canReadGroups, canReadTasks);
   return (
-    <aside className="flex min-w-0 flex-col justify-between overflow-hidden border-r border-line bg-[color-mix(in_oklch,var(--bg-base)_88%,transparent)] p-4 max-[1180px]:px-2.5 max-[900px]:hidden">
+    <aside className="flex min-w-0 flex-col justify-between overflow-hidden border-r border-line bg-bg-base p-3 max-[1180px]:px-2.5 max-[900px]:hidden">
       <nav className="grid min-w-0 gap-1.5 overflow-y-auto pr-0.5" aria-label="Разделы">
-        {items.map((item) => (
+        {items.map((item) => {
+          const Icon = sectionIcons[item.key as keyof typeof sectionIcons] ?? UsersThreeIcon;
+          return (
           <button
             key={item.key}
             type="button"
-            className={cx("grid min-h-10.5 w-full min-w-0 grid-cols-[20px_minmax(0,1fr)_42px] items-center gap-2 overflow-hidden rounded-[13px] border border-transparent px-2 py-0 text-left text-text-secondary transition duration-200", active === item.key && "border-[color-mix(in_oklch,var(--cyan)_32%,transparent)] bg-[color-mix(in_oklch,var(--cyan)_12%,transparent)] text-cyan")}
+            className={cx("grid min-h-10.5 w-full min-w-0 grid-cols-[20px_minmax(0,1fr)_42px] items-center gap-2 overflow-hidden rounded-[10px] border border-transparent px-2 py-0 text-left text-text-secondary transition duration-200 hover:bg-bg-raised hover:text-text-primary", active === item.key && "bg-bg-raised text-cyan")}
             aria-current={active === item.key ? "page" : undefined}
             onClick={() => onSelect(item.key)}
             title={item.count === undefined ? item.label : `${item.label}: ${item.count}`}
           >
-            <UsersThreeIcon
+            <Icon
               className="block h-4.5 w-4.5"
               size={18}
               weight="regular"
@@ -75,7 +89,8 @@ export function Sidebar({
             <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{item.label}</span>
             {item.count !== undefined && <b className="w-10.5 max-w-10.5 justify-self-end overflow-hidden rounded-full bg-white/6 px-1.5 py-0.5 text-center font-mono text-[11px] text-text-muted" title={`${item.count}`}>{formatCompactCount(item.count)}</b>}
           </button>
-        ))}
+          );
+        })}
       </nav>
       <div className="mt-3 grid min-w-0 gap-1.5 border-t border-line pt-3">
         {canAccessZgt ? (
@@ -186,16 +201,14 @@ export function SectionDrawer({
             <button
               key={item.key}
               type="button"
-              className={cx("grid min-h-12 w-full min-w-0 grid-cols-[22px_minmax(0,1fr)_46px] items-center gap-2.5 overflow-hidden rounded-[15px] border border-line bg-white/[0.035] px-3 text-left text-text-secondary transition active:translate-y-px", active === item.key && "border-[color-mix(in_oklch,var(--cyan)_34%,transparent)] bg-[color-mix(in_oklch,var(--cyan)_14%,transparent)] text-cyan")}
+              className={cx("grid min-h-12 w-full min-w-0 grid-cols-[22px_minmax(0,1fr)_46px] items-center gap-2.5 overflow-hidden rounded-[10px] border border-line bg-bg-panel px-3 text-left text-text-secondary transition active:translate-y-px", active === item.key && "border-transparent bg-bg-raised text-cyan")}
               aria-current={active === item.key ? "page" : undefined}
               onClick={() => onSelect(item.key)}
             >
-              <UsersThreeIcon
-                className="block h-4.5 w-4.5"
-                size={18}
-                weight="regular"
-                aria-hidden="true"
-              />
+              {(() => {
+                const Icon = sectionIcons[item.key as keyof typeof sectionIcons] ?? UsersThreeIcon;
+                return <Icon className="block h-4.5 w-4.5" size={18} weight="regular" aria-hidden="true" />;
+              })()}
               <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{item.label}</span>
               {item.count !== undefined && <b className="min-w-8.5 justify-self-end rounded-full bg-white/6 px-2 py-1 text-center font-mono text-[11px] text-text-muted">{formatCompactCount(item.count)}</b>}
             </button>
@@ -243,12 +256,12 @@ export function MobileSectionNav({
 }) {
   const items = sectionItems(people, counts, canReadGroups, canReadTasks);
   return (
-    <nav className="top-0 z-20 -mx-4 mb-3 hidden gap-2 overflow-x-auto overscroll-x-contain border-b border-line bg-[color-mix(in_oklch,var(--bg-base)_95%,transparent)] px-4 py-2.5 pb-3 max-[900px]:flex" aria-label="Разделы">
+    <nav className="top-0 z-20 -mx-4 mb-3 hidden gap-2 overflow-x-auto overscroll-x-contain border-b border-line bg-bg-base px-4 py-2.5 pb-3 max-[900px]:flex" aria-label="Разделы">
       {items.map((item) => (
         <button
           key={item.key}
           type="button"
-          className={cx("inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-line bg-white/4.5 px-3 text-text-secondary transition duration-200 active:translate-y-px", active === item.key && "border-[color-mix(in_oklch,var(--cyan)_34%,transparent)] bg-[color-mix(in_oklch,var(--cyan)_14%,transparent)] text-cyan")}
+          className={cx("inline-flex min-h-11 shrink-0 items-center gap-2 rounded-[10px] border border-line bg-bg-panel px-3 text-text-secondary transition duration-200 active:translate-y-px", active === item.key && "border-transparent bg-bg-raised text-cyan")}
           aria-current={active === item.key ? "page" : undefined}
           onClick={() => onSelect(item.key)}
         >

@@ -45,7 +45,7 @@ export type Action =
   | { type: "sort"; value: ListSortState };
 
 export const initialUi: UiState = {
-  activeSection: "overview",
+  activeSection: "all",
   searchQuery: "",
   locationFilter: null,
   locationFilterKeys: null,

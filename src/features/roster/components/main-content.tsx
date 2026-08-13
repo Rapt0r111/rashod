@@ -4,7 +4,7 @@ import type { LocationOption, Person, Platoon } from "../types";
 import type { Action, State } from "../state";
 import { filterPeople } from "../utils";
 import { sortListItems } from "@/components/list-utils";
-import { RosterRow } from "./person-views";
+import { RosterRow, RosterTable } from "./person-views";
 import { Overview } from "./overview-section";
 import {
   AllPlatoons,
@@ -146,7 +146,7 @@ function SearchResults({
         subtitle={`${results.length} ${results.length === 1 ? "человек" : "человек найдено"} по запросу «${query}»`}
       />
       {results.length > 0 ? (
-        <div className="grid min-w-0 grid-cols-1 gap-2.5 min-[1280px]:grid-cols-2">
+        <RosterTable>
           {results.map((person) => (
             <RosterRow
               key={person.id}
@@ -162,7 +162,7 @@ function SearchResults({
               onMore={handleOpenSheet}
             />
           ))}
-        </div>
+        </RosterTable>
       ) : (
         <EmptyState />
       )}

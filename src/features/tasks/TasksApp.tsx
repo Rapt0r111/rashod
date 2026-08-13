@@ -3,7 +3,6 @@
 import {
   CheckIcon,
   CaretDownIcon,
-  ClipboardTextIcon,
   ListChecksIcon,
   PlusIcon,
   StackIcon,
@@ -108,18 +107,15 @@ export function TasksApp({
 
   return (
     <section className="grid min-w-0 max-w-280 gap-4 p-4.5 text-text-primary max-[760px]:gap-3 max-[760px]:p-3">
-      <header className="relative flex items-end justify-between gap-6 overflow-hidden rounded-3xl border border-line bg-[radial-gradient(circle_at_89%_8%,oklch(70%_0.16_210/0.18),transparent_29%),linear-gradient(135deg,oklch(21%_0.055_286),oklch(15%_0.038_286))] p-6 shadow-(--shadow) max-[760px]:flex-col max-[760px]:items-start max-[760px]:p-4.75">
-        <div className="relative z-1 min-w-0 [&>h1]:my-[9px_0_7px] [&>h1]:text-[clamp(32px,5vw,46px)] [&>h1]:font-extrabold [&>h1]:leading-[0.95] [&>h1]:tracking-tighter [&>p]:m-0 [&>p]:max-w-[61ch] [&>p]:text-sm [&>p]:leading-[1.55] [&>p]:text-text-secondary">
-          <span className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.04em] text-cyan">
-            <ClipboardTextIcon size={16} /> Рабочее пространство
-          </span>
+      <header className="grid gap-4">
+        <div className="min-w-0 [&>h1]:my-0 [&>h1]:text-[28px] [&>h1]:font-bold [&>h1]:leading-[1.08] [&>h1]:tracking-[-0.02em] [&>p]:m-0 [&>p]:mt-2 [&>p]:max-w-[61ch] [&>p]:text-sm [&>p]:leading-[1.55] [&>p]:text-text-secondary">
           <h1>Задачи</h1>
           <p>
             Планируйте работу короткими шагами. Завершённое надёжно переносится
             в историю.
           </p>
         </div>
-        <div className="relative z-1 grid min-w-[min(100%,318px)] grid-cols-3 gap-2 max-[760px]:w-full [&>div]:grid [&>div]:min-w-0 [&>div]:gap-1 [&>div]:rounded-[15px] [&>div]:border [&>div]:border-white/10 [&>div]:bg-white/4.5 [&>div]:p-2.75 [&>div]:backdrop-blur-[10px] [&>div>span]:overflow-hidden [&>div>span]:truncate [&>div>span]:text-[11px] [&>div>span]:font-bold [&>div>span]:text-text-muted [&>div>b]:font-mono [&>div>b]:text-[25px] [&>div>b]:leading-none" aria-label="Сводка задач">
+        <div className="grid min-w-0 auto-cols-[minmax(7.25rem,1fr)] grid-flow-col gap-2 overflow-x-auto max-[760px]:w-full [&>div]:grid [&>div]:min-w-29 [&>div]:gap-2 [&>div]:rounded-[10px] [&>div]:border [&>div]:border-line [&>div]:bg-bg-panel [&>div]:px-3 [&>div]:py-2.5 [&>div>span]:overflow-hidden [&>div>span]:truncate [&>div>span]:text-xs [&>div>span]:font-semibold [&>div>span]:text-text-secondary [&>div>b]:font-mono [&>div>b]:text-[1.75rem] [&>div>b]:leading-none [&>div>b]:tracking-[-0.04em]" aria-label="Сводка задач">
           <div>
             <span>В работе</span>
             <b>{snapshot.active.length}</b>
@@ -137,13 +133,13 @@ export function TasksApp({
 
       {canWrite && (
         <form
-          className="flex items-stretch gap-2.75 rounded-[18px] border border-line bg-bg-panel p-2.75 shadow-(--shadow) max-[760px]:flex-wrap max-[760px]:items-start"
+          className="flex items-stretch gap-2.75 rounded-[12px] border border-line bg-bg-panel p-2.75 max-[760px]:flex-wrap max-[760px]:items-start"
           onSubmit={(event) => {
             event.preventDefault();
             void create();
           }}
         >
-          <div className="grid h-10.5 w-10.5 shrink-0 place-items-center rounded-[13px] bg-[linear-gradient(135deg,var(--accent),var(--cyan))] text-[oklch(12%_0.04_286)]">
+          <div className="grid h-10.5 w-10.5 shrink-0 place-items-center rounded-[10px] bg-accent text-[oklch(12%_0.04_286)]">
             <PlusIcon size={19} />
           </div>
           <div className="grid min-w-0 flex-1 grid-cols-[minmax(170px,0.9fr)_minmax(220px,1.5fr)] gap-2 max-[760px]:min-w-[calc(100%-54px)] max-[760px]:grid-cols-1">
@@ -405,7 +401,7 @@ function TaskCard({
   }
   return (
     <article
-      className={`relative overflow-hidden bg-bg-panel transition-colors duration-200 hover:bg-white/2.5 ${task.children.length > 0 ? "border-l-[3px] border-l-accent" : ""}`}
+      className="relative overflow-hidden bg-bg-panel transition-colors duration-200 hover:bg-white/2.5"
       data-has-children={task.children.length > 0 || undefined}
     >
       <div className="flex items-start gap-3 p-4">

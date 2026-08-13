@@ -79,8 +79,8 @@ export function SearchSortControl({
       {showSearch && (
         <div
           className={cx(
-            "flex min-h-9.5 min-w-0 flex-1 basis-full items-center gap-2 rounded-[11px] border border-line bg-white/4.5 px-2.5 text-text-muted transition-[border-color,box-shadow] duration-200 focus-within:border-accent-line focus-within:shadow-[0_0_0_3px_var(--accent-soft)] sm:basis-65 sm:min-w-45",
-            compact && "min-h-10.5",
+            "flex min-h-[42px] min-w-0 flex-1 basis-full items-center gap-2 rounded-[10px] border border-line bg-bg-raised px-3 text-text-muted transition-[border-color,box-shadow] duration-200 focus-within:border-cyan focus-within:shadow-[0_0_0_3px_color-mix(in_oklch,var(--cyan)_22%,transparent)] sm:basis-65 sm:min-w-45",
+            compact && "min-h-[42px]",
           )}
         >
           <ListMagnifyingGlassIcon
@@ -94,7 +94,7 @@ export function SearchSortControl({
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder={placeholder}
             aria-label={placeholder}
-            type="search"
+            type="text"
             autoFocus={autoFocus}
           />
           {query && (

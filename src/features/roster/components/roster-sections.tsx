@@ -12,7 +12,7 @@ import {
 import { locationsAndCustom, presentLocationKeys } from "../roster-metrics";
 import { sortListItems } from "@/components/list-utils";
 import type { SelectionProps } from "./selection-types";
-import { PersonCard, RosterRow } from "./person-views";
+import { RosterRow, RosterTable } from "./person-views";
 import {
   EmptyState,
   FilterPills,
@@ -225,12 +225,13 @@ export function AllPlatoons({
               {inRota}/{group.length} в роте
             </b>
           </div>
-          <div className="grid grid-cols-1 gap-2.5 min-[1280px]:grid-cols-2 min-[1840px]:grid-cols-3">
+          <RosterTable>
             {group.map((person) => (
               <RosterRow
                 key={person.id}
                 person={person}
                 locations={locations}
+                contextLabel={platoon.label}
                 flash={state.flashPersonId === person.id}
                 pending={selection.pendingIds.has(person.id)}
                 canWrite={canWrite}
@@ -240,7 +241,7 @@ export function AllPlatoons({
                 onMore={handleOpenSheet}
               />
             ))}
-          </div>
+          </RosterTable>
         </section>
       ))}
       {visibleGroups.length === 0 && <EmptyState />}
@@ -379,20 +380,23 @@ export function PlatoonSection({
           onPick={handleConscriptionFilter}
         />
       </CollapsibleFilter>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-3">
+      <RosterTable>
         {filtered.map((person) => (
-          <PersonCard
+          <RosterRow
             key={person.id}
             person={person}
             locations={locations}
+            contextLabel={platoon.label}
             flash={state.flashPersonId === person.id}
+            pending={selection.pendingIds.has(person.id)}
             canWrite={canWrite}
             selected={selection.selectedIds.has(person.id)}
             onToggleSelect={selection.onToggleSelect}
-            onClick={handleOpenSheet}
+            onLocation={onLocation}
+            onMore={handleOpenSheet}
           />
         ))}
-      </div>
+      </RosterTable>
       {filtered.length === 0 && <EmptyState />}
     </section>
   );

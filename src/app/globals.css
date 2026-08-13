@@ -83,12 +83,12 @@
 
 @layer base {
   :root {
-    --bg-base: oklch(13% 0.036 286);
-    --bg-panel: oklch(17% 0.038 286 / 0.88);
-    --bg-raised: oklch(21% 0.042 286 / 0.82);
-    --bg-overlay: oklch(9% 0.03 286 / 0.72);
-    --line: oklch(82% 0.06 286 / 0.14);
-    --line-strong: oklch(82% 0.08 286 / 0.28);
+    --bg-base: oklch(13% 0.028 286);
+    --bg-panel: oklch(16.5% 0.03 286);
+    --bg-raised: oklch(19.5% 0.032 286);
+    --bg-overlay: oklch(9% 0.024 286 / 0.78);
+    --line: oklch(82% 0.04 286 / 0.12);
+    --line-strong: oklch(82% 0.05 286 / 0.24);
     --text-primary: oklch(94% 0.01 286);
     --text-secondary: oklch(76% 0.025 286);
     --text-muted: oklch(60% 0.026 286);
@@ -102,14 +102,14 @@
     --red: oklch(69% 0.18 28);
     --violet: oklch(72% 0.18 302);
     --neutral: oklch(75% 0.025 286);
-    --scrollbar-track: oklch(100% 0 0 / 0.045);
-    --scrollbar-thumb: oklch(77% 0.14 191 / 0.5);
-    --scrollbar-thumb-strong: oklch(68% 0.19 302 / 0.72);
+    --scrollbar-track: oklch(100% 0 0 / 0.03);
+    --scrollbar-thumb: oklch(82% 0.04 286 / 0.28);
+    --scrollbar-thumb-strong: oklch(82% 0.04 286 / 0.42);
     --shadow:
-      0 12px 30px rgb(0 0 0 / 0.28), inset 0 1px 0 rgb(255 255 255 / 0.05);
+      0 16px 40px rgb(0 0 0 / 0.32), inset 0 1px 0 rgb(255 255 255 / 0.04);
     --radius-control: 10px;
-    --radius-panel: 16px;
-    --radius-section: 22px;
+    --radius-panel: 12px;
+    --radius-section: 16px;
     --control-height: 42px;
   }
 
@@ -147,21 +147,11 @@
     min-height: 44px;
     border: 2px solid transparent;
     border-radius: 999px;
-    background: linear-gradient(
-        180deg,
-        var(--scrollbar-thumb),
-        var(--scrollbar-thumb-strong)
-      )
-      padding-box;
+    background: var(--scrollbar-thumb) padding-box;
   }
 
   *::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(
-        180deg,
-        color-mix(in oklch, var(--cyan) 84%, white 10%),
-        color-mix(in oklch, var(--accent) 88%, white 8%)
-      )
-      padding-box;
+    background: var(--scrollbar-thumb-strong) padding-box;
   }
 
   *::-webkit-scrollbar-corner {
@@ -207,19 +197,7 @@
     color: var(--text-primary);
   }
 
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 0;
-    opacity: 0.12;
-    background-image: radial-gradient(
-      rgb(255 255 255 / 0.12) 0.6px,
-      transparent 0.6px
-    );
-    background-size: 18px 18px;
-  }
+
 
   :focus-visible {
     outline: 2px solid var(--cyan);

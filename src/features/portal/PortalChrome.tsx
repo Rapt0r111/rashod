@@ -85,9 +85,9 @@ function PortalShellFrame({
   return (
     <div
       data-portal-shell=""
-      className="relative z-1 isolate flex h-dvh min-h-0 flex-col overflow-hidden bg-bg-base bg-[radial-gradient(circle_at_18%_-8%,oklch(32%_0.12_302/0.28),transparent_36%),radial-gradient(circle_at_88%_12%,oklch(34%_0.11_193/0.16),transparent_30%)] text-text-primary"
+      className="relative z-1 isolate flex h-dvh min-h-0 flex-col overflow-hidden bg-bg-base text-text-primary"
     >
-      <header className="shrink-0 border-b border-line bg-[color-mix(in_oklch,var(--bg-base)_94%,transparent)] backdrop-blur-md">
+      <header className="shrink-0 border-b border-line bg-bg-base">
         <div className="mx-auto flex min-h-16 w-full items-center gap-3 px-5 py-2.5 max-[560px]:px-3">
           <Link
             href="/portal"
@@ -95,7 +95,7 @@ function PortalShellFrame({
             className="flex min-w-0 items-center gap-3 no-underline text-inherit"
             aria-label="Портал роты"
           >
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[13px] bg-[linear-gradient(135deg,var(--accent),var(--cyan))] font-extrabold text-[oklch(12%_0.04_286)]">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-accent font-extrabold text-[oklch(12%_0.04_286)]">
               Р
             </div>
             <div className="min-w-0 max-[420px]:hidden">
@@ -117,10 +117,10 @@ function PortalShellFrame({
                 href="/portal"
                 prefetch
                 className={cx(
-                  "inline-flex min-h-[42px] shrink-0 items-center rounded-[13px] border px-3 text-xs font-semibold no-underline transition-[background-color,border-color,color] duration-150",
+                  "inline-flex min-h-[42px] shrink-0 items-center rounded-[10px] border px-3 text-xs font-semibold no-underline transition-[background-color,border-color,color] duration-150",
                   activeModule === "portal"
                     ? "border-accent-line bg-accent-soft text-text-primary"
-                    : "border-line bg-white/4 text-text-secondary hover:border-line-strong hover:text-text-primary",
+                    : "border-transparent text-text-secondary hover:bg-bg-raised hover:text-text-primary",
                 )}
               >
                 Модули
@@ -133,10 +133,10 @@ function PortalShellFrame({
                     href={module.href}
                     prefetch
                     className={cx(
-                      "inline-flex min-h-[42px] shrink-0 items-center rounded-[13px] border px-3 text-xs font-semibold no-underline transition-[background-color,border-color,color] duration-150",
+                      "inline-flex min-h-[42px] shrink-0 items-center rounded-[10px] border px-3 text-xs font-semibold no-underline transition-[background-color,border-color,color] duration-150",
                       active
-                        ? "border-[color-mix(in_oklch,var(--cyan)_34%,transparent)] bg-[color-mix(in_oklch,var(--cyan)_14%,transparent)] text-cyan"
-                        : "border-line bg-white/4 text-text-secondary hover:border-line-strong hover:text-text-primary",
+                        ? "border-transparent bg-bg-raised text-cyan"
+                        : "border-transparent text-text-secondary hover:bg-bg-raised hover:text-text-primary",
                     )}
                     aria-current={active ? "page" : undefined}
                   >

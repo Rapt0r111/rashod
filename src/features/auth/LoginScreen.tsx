@@ -41,10 +41,10 @@ export function LoginScreen({ setupRequired }: { setupRequired: boolean }) {
 
   return (
     <main className="grid min-h-dvh place-items-center bg-bg-base px-5 py-10 text-text-primary">
-      <section className="w-full max-w-md rounded-[16px] border border-line bg-bg-panel p-6 shadow-(--shadow)">
+      <section className="w-full max-w-md rounded-[12px] border border-line bg-bg-panel p-6">
         <div className="mb-5 flex items-center gap-3">
           <div
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-[13px] bg-[linear-gradient(135deg,var(--accent),var(--cyan))] text-base font-extrabold text-[oklch(12%_0.04_286)]"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-[10px] bg-accent text-base font-extrabold text-[oklch(12%_0.04_286)]"
             aria-hidden
           >
             Р

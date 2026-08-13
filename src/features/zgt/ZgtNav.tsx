@@ -39,7 +39,7 @@ const LINKS = [
 export function ZgtNav({ activePath }: { activePath: string }) {
   return (
     <nav
-      className="mb-4 flex gap-1.5 overflow-x-auto rounded-2xl border border-line bg-bg-panel/70 p-1.5"
+      className="mb-4 flex gap-1 overflow-x-auto border-b border-line pb-2"
       aria-label="Разделы ЗГТ"
     >
       {LINKS.map((link) => {
@@ -53,10 +53,10 @@ export function ZgtNav({ activePath }: { activePath: string }) {
             key={link.href}
             href={link.href}
             className={cx(
-              "inline-flex min-h-[42px] shrink-0 items-center gap-2 rounded-[13px] border px-3 text-sm font-semibold no-underline transition-[background-color,border-color,color,box-shadow] duration-150 focus-visible:border-cyan focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_color-mix(in_oklch,var(--cyan)_22%,transparent)]",
+              "inline-flex min-h-[42px] shrink-0 items-center gap-2 rounded-[10px] border px-3 text-sm font-semibold no-underline transition-[background-color,border-color,color,box-shadow] duration-150 focus-visible:border-cyan focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_color-mix(in_oklch,var(--cyan)_22%,transparent)]",
               active
-                ? "border-[color-mix(in_oklch,var(--cyan)_34%,transparent)] bg-[color-mix(in_oklch,var(--cyan)_14%,transparent)] text-cyan"
-                : "border-transparent text-text-secondary hover:border-line hover:bg-white/[0.04] hover:text-text-primary",
+                ? "border-transparent bg-bg-raised text-cyan"
+                : "border-transparent text-text-secondary hover:bg-bg-raised hover:text-text-primary",
             )}
             aria-current={active ? "page" : undefined}
           >

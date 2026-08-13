@@ -339,7 +339,7 @@ export function ScheduleApp({
 
   return (
     <section className="schedule-screen grid min-w-0 max-w-[1680px] gap-4 p-4.5 text-text-primary max-[760px]:gap-3 max-[760px]:p-3">
-      <header className="schedule-toolbar relative overflow-hidden rounded-[26px] border border-line bg-[radial-gradient(circle_at_88%_12%,oklch(77%_0.14_191/0.16),transparent_25%),linear-gradient(135deg,oklch(21%_0.055_286),oklch(15%_0.038_286))] p-5.5 shadow-(--shadow) max-[760px]:p-4">
+      <header className="schedule-toolbar relative overflow-hidden rounded-[12px] border border-line bg-bg-panel p-5.5 max-[760px]:p-4">
         <div className="relative z-1 flex items-start justify-between gap-5 max-[900px]:flex-col">
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.12em] text-cyan">
