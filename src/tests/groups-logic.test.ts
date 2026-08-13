@@ -14,6 +14,8 @@ import {
   quotaAssignmentCounts,
   quotaTotal,
   pickRotationCandidates,
+  peopleAvailableOnAnyDate,
+  conflictStateFromLive,
   resolveRuleEnabledPlatoons,
   rulePlatoonFilter,
   selectQuotaRotationPool,
@@ -234,6 +236,31 @@ describe("group rotation priority", () => {
 
   it("shuffles direct random picks deterministically when rng is injected", () => {
     expect(pickRandomAssignment(people, 2, () => 0).map((item) => item.id)).toEqual(["p2", "p3"]);
+  });
+});
+
+describe("candidate availability", () => {
+  it("returns null when any requested date is missing from the map", () => {
+    expect(peopleAvailableOnAnyDate({ "2026-08-12": [people[0]] }, ["2026-08-12", "2026-08-13"])).toBeNull();
+  });
+
+  it("unions people who are free on any date in the range", () => {
+    const result = peopleAvailableOnAnyDate(
+      {
+        "2026-08-12": [people[0]],
+        "2026-08-13": [people[1], people[0]],
+      },
+      ["2026-08-12", "2026-08-13"],
+    );
+    expect(result?.map((person) => person.id)).toEqual(["p1", "p2"]);
+  });
+});
+
+describe("live conflict state", () => {
+  it("ignores a stored flag and uses only live intersections", () => {
+    expect(conflictStateFromLive([])).toBe("clear");
+    expect(conflictStateFromLive([{ kind: "allowed" }])).toBe("allowed");
+    expect(conflictStateFromLive([{ kind: "allowed" }, { kind: "blocking" }])).toBe("warning");
   });
 });
 

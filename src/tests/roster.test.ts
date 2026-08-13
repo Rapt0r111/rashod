@@ -9,6 +9,7 @@ import {
   locationLabel,
 } from "@/features/roster/utils";
 import type { Person } from "@/features/roster/types";
+import { locationChangeLog } from "@/server/db/postgres-roster-repository";
 
 describe("seed data", () => {
   it("creates stable default roster", () => {
@@ -21,6 +22,18 @@ describe("seed data", () => {
       second.people.map((person) => person.id),
     );
     expect(countInRota(first.people)).toBe(71);
+  });
+});
+
+describe("location movement log", () => {
+  it("writes a log only when an existing person changes location", () => {
+    expect(locationChangeLog(undefined, "naryad")).toBeNull();
+    expect(locationChangeLog({ name: "Иванов", location: "rota" }, "rota")).toBeNull();
+    expect(locationChangeLog({ name: "Иванов", location: "rota" }, "naryad")).toEqual({
+      name: "Иванов",
+      from: "rota",
+      to: "naryad",
+    });
   });
 });
 

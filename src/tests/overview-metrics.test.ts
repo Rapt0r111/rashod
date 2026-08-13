@@ -103,6 +103,13 @@ describe("roster balance", () => {
     expect(balance.present + balance.away).toBe(balance.total);
   });
 
+  it("allows every location to stop counting as present", () => {
+    const nonePresent = locations.map((location) => ({ ...location, countsAsPresent: false }));
+    expect(presentLocationKeys(nonePresent)).toEqual([]);
+    const people = [person("1", "rota"), person("2", "naryad")];
+    expect(rosterBalance(people, presentLocationKeys(nonePresent)).present).toBe(0);
+  });
+
   it("honors multiple countsAsPresent locations", () => {
     const withNaryadPresent: LocationOption[] = locations.map((location) =>
       location.key === "naryad" ? { ...location, countsAsPresent: true } : location,

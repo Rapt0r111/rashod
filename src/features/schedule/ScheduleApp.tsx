@@ -17,6 +17,7 @@ import { ApiError, getApiErrorMessage } from "@/lib/api-client";
 import {
   assignSchedulePerson,
   fetchScheduleSnapshot,
+  generateSchedule,
   removeScheduleAssignment,
 } from "./api";
 import { exportScheduleCsv, buildScheduleCsv } from "./csv";
@@ -74,6 +75,9 @@ function getScheduleAssignmentErrorMessage(cause: unknown) {
   if (cause.code === "GROUP_ASSIGNMENT_CONFLICT") {
     return "Назначение заблокировано: человек уже назначен в другую строгую группу на эту дату.";
   }
+  if (cause.code === "GROUP_ASSIGNMENT_ALREADY_EXISTS") {
+    return "Этот человек уже назначен в группу на выбранную дату.";
+  }
   if (cause.code === "GROUP_ASSIGNMENT_OVERFILLED") {
     return "На выбранную дату в этой группе уже назначено нужное количество людей.";
   }
@@ -129,6 +133,26 @@ export function ScheduleApp({
     applySnapshot(next);
     return true;
   }, [applySnapshot]);
+
+  const generate = useCallback(async () => {
+    if (!canWrite) return;
+    const range = scheduleDateRange(from, to);
+    if (!range) {
+      setError("Проверьте даты периода. Можно выбрать от 1 до 366 дней.");
+      return;
+    }
+    setPending(true);
+    setError(null);
+    setNotice(null);
+    try {
+      applySnapshot(await generateSchedule(from, to));
+      setNotice(`Автоназначения сформированы на ${from} — ${to}. Ручные назначения сохранены.`);
+    } catch (cause) {
+      setError(getApiErrorMessage(cause, "Не удалось сформировать график."));
+    } finally {
+      setPending(false);
+    }
+  }, [applySnapshot, canWrite, from, to]);
 
   const refresh = useCallback(async () => {
     try {
@@ -351,6 +375,11 @@ export function ScheduleApp({
             ))}
           </div>
           <span className="flex-1" />
+          {canWrite ? (
+            <button type="button" className="min-h-10.5 rounded-[11px] border border-accent-line bg-accent-soft px-3.5 text-sm font-extrabold text-text-primary transition hover:border-accent hover:bg-accent/15 disabled:opacity-55" onClick={() => void generate()} disabled={pending}>
+              {pending ? "Формируем…" : "Сформировать"}
+            </button>
+          ) : null}
           <button type="button" className="min-h-10.5 rounded-[11px] border border-line bg-white/5 px-3.5 text-sm font-bold text-text-secondary transition hover:border-line-strong hover:bg-white/9 hover:text-text-primary" onClick={onOpenGroups}>Настроить группы</button>
           <button type="button" className="inline-flex min-h-10.5 items-center gap-2 rounded-[11px] border border-line bg-white/5 px-3.5 text-sm font-bold text-text-secondary transition hover:border-line-strong hover:bg-white/9 hover:text-text-primary" onClick={() => window.print()}><PrinterIcon size={17} aria-hidden="true" /> Печать</button>
           <button type="button" className="inline-flex min-h-10.5 items-center gap-2 rounded-[11px] border border-line bg-white/5 px-3.5 text-sm font-bold text-text-secondary transition hover:border-line-strong hover:bg-white/9 hover:text-text-primary" onClick={() => exportScheduleCsv(buildScheduleCsv(snapshot), snapshot.from, snapshot.to)}><DownloadSimpleIcon size={17} aria-hidden="true" /> CSV</button>

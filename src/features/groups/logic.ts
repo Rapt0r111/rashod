@@ -1,6 +1,7 @@
 
 import type { Person } from "../roster/types";
 import type {
+  ConflictState,
   GroupAssignment,
   GroupAssignmentQuota,
   GroupExclusion,
@@ -11,6 +12,29 @@ import type {
 
 export function normalizeOverlapPolicy(value: unknown): GroupOverlapPolicy {
   return value === "manual" ? "manual" : "exclusive";
+}
+
+export function conflictStateFromLive(
+  conflicts: readonly { kind: "blocking" | "allowed" }[],
+): ConflictState {
+  if (conflicts.some((conflict) => conflict.kind === "blocking")) return "warning";
+  if (conflicts.length > 0) return "allowed";
+  return "clear";
+}
+
+export function peopleAvailableOnAnyDate(
+  availablePeopleByDate: Record<string, Person[] | undefined>,
+  dates: readonly string[],
+): Person[] | null {
+  const lists = dates.map((date) => availablePeopleByDate[date]);
+  if (lists.some((list) => list === undefined)) return null;
+  const byId = new Map<string, Person>();
+  for (const list of lists) {
+    for (const person of list ?? []) {
+      if (!byId.has(person.id)) byId.set(person.id, person);
+    }
+  }
+  return [...byId.values()];
 }
 
 export function classifyOverlap(

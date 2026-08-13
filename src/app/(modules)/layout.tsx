@@ -1,7 +1,7 @@
 import { Suspense, type ReactNode } from "react";
 import {
+  PortalContentFallback,
   PortalShell,
-  PortalShellFallback,
 } from "@/features/portal/PortalChrome";
 import { modulesForPermissions } from "@/features/portal/modules";
 import { getRequestAuth } from "@/server/auth/request-auth";
@@ -13,7 +13,7 @@ import { getRequestAuth } from "@/server/auth/request-auth";
  */
 export default function ModulesLayout({ children }: { children: ReactNode }) {
   return (
-    <Suspense fallback={<PortalShellFallback />}>
+    <Suspense fallback={<PortalContentFallback />}>
       <ModulesShellGate>{children}</ModulesShellGate>
     </Suspense>
   );

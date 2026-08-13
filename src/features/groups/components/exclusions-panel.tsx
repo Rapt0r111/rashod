@@ -48,18 +48,21 @@ export function ExclusionsPanel({
   });
   const [day, setDay] = useState("");
   const [reason, setReason] = useState("");
-  const excludedPersonIds = useMemo(
-    () => new Set(item.exclusions.map((exclusion) => exclusion.personId)),
-    [item.exclusions],
-  );
+  const selectedDay = day === "" ? null : Number(day);
   const peopleOptions = useMemo(() => {
     return item.candidatePeople
-      .filter((person) => !excludedPersonIds.has(person.id))
+      .filter((person) =>
+        !item.exclusions.some(
+          (exclusion) =>
+            exclusion.personId === person.id &&
+            (exclusion.dayOfWeek === null || exclusion.dayOfWeek === selectedDay),
+        ),
+      )
       .map((person) => ({
         value: person.id,
         label: `${abbreviateName(person.name)} · ${person.rank}${person.conscriptionNumber ? ` · ${conscriptionLabel(person.conscriptionNumber)}` : ""}`,
       }));
-  }, [excludedPersonIds, item.candidatePeople]);
+  }, [item.candidatePeople, item.exclusions, selectedDay]);
   const visibleExclusions = useMemo(
     () =>
       sortListItems(

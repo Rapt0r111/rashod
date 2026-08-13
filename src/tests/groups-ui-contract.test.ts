@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import {
+  scheduleCacheAfterGroupsEvent,
+  shouldFetchScheduleOnEnter,
+} from "@/features/WorkspaceApp";
 
 const read = (path: string) =>
   readFileSync(resolve(process.cwd(), path), "utf8");
@@ -30,6 +34,14 @@ const groupsApiSource = read("src/features/groups/api.ts");
 const searchSource = read("src/components/search-sort-control.tsx");
 
 describe("Groups responsive UI contract", () => {
+  it("refetches the groups-only schedule on every enter and drops it on SSE when hidden", () => {
+    expect(shouldFetchScheduleOnEnter()).toBe(true);
+    expect(scheduleCacheAfterGroupsEvent("schedule")).toBe("reload");
+    expect(scheduleCacheAfterGroupsEvent("groups")).toBe("drop");
+    expect(workspaceSource).not.toContain("if (scheduleSnapshot || loadingSchedule) return");
+    expect(workspaceSource).toContain("useRealtimeDomain([\"groups\", \"unknown\"]");
+  });
+
   it("gives the standalone groups route its own scroll container", () => {
     expect(workspaceSource).toContain(
       'className="h-dvh min-h-0 min-w-0 overflow-y-auto overscroll-contain bg-bg-base"',
@@ -121,6 +133,9 @@ describe("Groups responsive UI contract", () => {
     expect(groupsPickerSource).toContain("schedulePresetRange");
     expect(groupsPickerSource).toContain('["month", "Месяц"]');
     expect(groupsPickerSource).toContain('type="date"');
+    expect(groupsPickerSource).toContain("fetchGroupCandidates");
+    expect(groupsPickerSource).toContain("peopleAvailableOnAnyDate");
+    expect(groupsPickerSource).not.toContain("dates.length === 1 ? people : candidatePeople");
   });
 
   it("bounds editable group text and preserves dialog semantics", () => {
@@ -151,5 +166,12 @@ describe("Groups responsive UI contract", () => {
     expect(groupsSource).toContain("useState<Platoon[]>(initialSnapshot.platoons)");
     expect(groupsSource).toContain("setPlatoons(next.platoons)");
     expect(groupsSource).not.toContain('fetch("/api/platoons")');
+  });
+
+  it("syncs settings from the active group without a remount key", () => {
+    expect(groupsSource).not.toContain("key={activeSnapshot.group.id}");
+    expect(groupsSettingsSource).toContain("settingsSavedRevision");
+    expect(groupsSettingsSource).toContain("}, [savedRevision]);")
+    expect(groupsExclusionsSource).toContain("exclusion.dayOfWeek === selectedDay");
   });
 });

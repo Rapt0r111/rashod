@@ -11,7 +11,7 @@ export const PHONES_PAGE_SIZE = 25;
 
 export type PhoneRecord = {
   id: string;
-  personId: string;
+  personId: string | null;
   personName: string | null;
   personRank: string | null;
   brand: string | null;

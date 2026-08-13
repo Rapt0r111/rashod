@@ -15,6 +15,7 @@ describe("classifyRealtimeReason", () => {
     expect(classifyRealtimeReason("groups")).toBe("groups");
     expect(classifyRealtimeReason("groups-refresh")).toBe("groups");
     expect(classifyRealtimeReason("tasks")).toBe("tasks");
+    expect(classifyRealtimeReason("zgt")).toBe("zgt");
   });
 
   it("treats empty or unknown reasons as unknown so all domains refresh", () => {

@@ -18,6 +18,7 @@ import {
   type StorageItemType,
 } from "@/features/zgt/storage-items-types";
 import { liveJson } from "@/server/cache/http";
+import { publishRosterChanged } from "@/server/events";
 
 
 export async function GET(request: Request) {
@@ -65,6 +66,7 @@ export async function POST(request: Request) {
         () => createStorageItem(body.data, auth.user.id),
         { type: body.data.type },
       );
+      publishRosterChanged("zgt");
       return NextResponse.json({ item });
     }
     if (body.action === "update") {
@@ -74,6 +76,7 @@ export async function POST(request: Request) {
         () => updateStorageItem(body.id, body.data),
         { storageItemId: body.id },
       );
+      publishRosterChanged("zgt");
       return NextResponse.json({ item });
     }
     if (body.action === "delete") {
@@ -83,6 +86,7 @@ export async function POST(request: Request) {
         () => softDeleteStorageItem(body.id),
         { storageItemId: body.id },
       );
+      publishRosterChanged("zgt");
       return NextResponse.json({ ok: true });
     }
     if (body.action === "batch-issue") {
@@ -92,6 +96,7 @@ export async function POST(request: Request) {
         () => batchIssueStorageItems(body.data),
         { count: body.data.ids.length },
       );
+      publishRosterChanged("zgt");
       return NextResponse.json(result);
     }
     const result = await runAuditedMutation(
@@ -100,6 +105,7 @@ export async function POST(request: Request) {
       () => batchReturnStorageItems(body.data),
       { count: body.data.ids.length },
     );
+    publishRosterChanged("zgt");
     return NextResponse.json(result);
   } catch (error) {
     return apiError(error);

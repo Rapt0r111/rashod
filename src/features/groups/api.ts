@@ -80,6 +80,10 @@ export function getGroupErrorMessage(error: unknown, fallback: string) {
     }
   }
 
+  if (error.code === "GROUP_ASSIGNMENT_ALREADY_EXISTS") {
+    return "Этот человек уже назначен в группу на выбранную дату.";
+  }
+
   if (error.code === "GROUP_ASSIGNMENT_OVERFILLED") {
     return "На выбранную дату уже назначено нужное количество людей.";
   }
@@ -108,6 +112,23 @@ export async function fetchGroupJson<T>(url: string, init?: RequestInit): Promis
 
 export function fetchGroupsSnapshot(): Promise<GroupsSnapshot> {
   return fetchGroupJson<GroupsSnapshot>("/api/groups");
+}
+
+export type GroupCandidatesResult = {
+  groupId: string;
+  from: string;
+  to: string;
+  dates: string[];
+  availablePeopleByDate: Record<string, import("../roster/types").Person[]>;
+};
+
+export function fetchGroupCandidates(
+  groupId: string,
+  from: string,
+  to: string,
+): Promise<GroupCandidatesResult> {
+  const params = new URLSearchParams({ groupId, from, to });
+  return fetchGroupJson<GroupCandidatesResult>(`/api/groups/candidates?${params.toString()}`);
 }
 
 export function createGroup(input: GroupCreateInput): Promise<GroupsSnapshot> {

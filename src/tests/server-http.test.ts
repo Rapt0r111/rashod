@@ -70,6 +70,11 @@ describe("server HTTP contract", () => {
     ["ROLE_GRANT_FORBIDDEN", 403],
     ["SYSTEM_LOCATION_PROTECTED", 409],
     ["SYSTEM_PLATOON_PROTECTED", 409],
+    ["GROUP_ASSIGNMENT_ALREADY_EXISTS", 409],
+    ["INVENTORY_NUMBER_EXISTS", 409],
+    ["EQUIPMENT_NOT_FOUND", 404],
+    ["PHONE_NOT_FOUND", 404],
+    ["STORAGE_ITEM_NOT_FOUND", 404],
   ])("maps %s", async (code, status) => {
     expect(apiError(new Error(code)).status).toBe(status);
   });

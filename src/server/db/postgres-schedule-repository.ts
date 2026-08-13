@@ -2,6 +2,7 @@ import type { DutyGroup, GroupAssignment, GroupConflict, GroupRule } from "@/fea
 import type { Person, Platoon } from "@/features/roster/types";
 import {
   classifyOverlap,
+  conflictStateFromLive,
   normalizeAssignmentQuotas,
   normalizeOverlapPolicy,
   normalizePriorityMode,
@@ -44,21 +45,35 @@ function assignmentDate(value: string | Date) {
   return typeof value === "string" ? value : value.toISOString().slice(0, 10);
 }
 
-function normalizeStringArray(value: unknown): string[] {
-  if (typeof value === "string") {
-    try { value = JSON.parse(value) as unknown; } catch { return []; }
+function unwrapJsonScalar(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  if (!trimmed) return value;
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return value;
   }
-  return Array.isArray(value)
-    ? [...new Set(value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean))]
-    : [];
 }
 
-function normalizeActiveDays(value: unknown): number[] {
-  if (typeof value === "string") {
-    try { value = JSON.parse(value) as unknown; } catch { return [0, 1, 2, 3, 4, 5, 6]; }
-  }
-  if (!Array.isArray(value)) return [0, 1, 2, 3, 4, 5, 6];
-  return [...new Set(value.map(Number).filter((item) => Number.isInteger(item) && item >= 0 && item <= 6))].sort((a, b) => a - b);
+function normalizeStringArray(value: unknown): string[] {
+  const unwrapped = unwrapJsonScalar(value);
+  if (!Array.isArray(unwrapped)) return [];
+  return [...new Set(unwrapped.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean))];
+}
+
+function normalizeActiveDays(value: unknown, fallback: number[] = [0, 1, 2, 3, 4, 5, 6]): number[] {
+  const unwrapped = unwrapJsonScalar(value);
+  if (!Array.isArray(unwrapped)) return [...fallback];
+  const normalized = unwrapped
+    .map((item) => {
+      if (typeof item === "number") return item;
+      if (typeof item === "string" && item.trim() !== "") return Number(item);
+      return Number.NaN;
+    })
+    .filter((item) => Number.isInteger(item) && item >= 0 && item <= 6);
+  const unique = [...new Set(normalized)].sort((left, right) => left - right);
+  return unique.length || unwrapped.length === 0 ? unique : [...fallback];
 }
 
 function toPerson(row: DbPerson): Person {
@@ -146,7 +161,6 @@ export async function getPostgresScheduleSnapshot(
         ),
       }));
     const source = row.source === "manual" ? "manual" : "auto";
-    const hasBlockingConflict = conflicts.some((conflict) => conflict.kind === "blocking");
     return {
       id: row.id,
       groupId: row.groupId,
@@ -156,9 +170,7 @@ export async function getPostgresScheduleSnapshot(
       personConscriptionNumber: row.personConscriptionNumber,
       assignedDate: date,
       source,
-      conflictState: hasBlockingConflict || row.conflictState === "warning"
-        ? "warning"
-        : conflicts.length || row.conflictState === "allowed" ? "allowed" : "clear",
+      conflictState: conflictStateFromLive(conflicts),
       conflicts,
       createdAt: row.created_at.getTime(),
     };

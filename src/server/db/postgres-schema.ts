@@ -126,7 +126,7 @@ export const equipmentTransfers = pgTable("equipment_transfers", {
 ]);
 export const phones = pgTable("phones", {
   id: id(),
-  personId: text("person_id").notNull().references(() => people.id, { onDelete: "restrict", onUpdate: "cascade" }),
+  personId: text("person_id").references(() => people.id, { onDelete: "set null", onUpdate: "cascade" }),
   brand: text("brand"),
   model: text("model").notNull(),
   color: text("color"),

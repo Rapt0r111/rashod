@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requirePermission } from "@/server/auth";
 import { upsertPersonnelProfile } from "@/server/db/postgres-zgt-repository";
 import { apiError, idString, optionalText, parseJson, runAuditedMutation } from "@/server/http";
+import { publishRosterChanged } from "@/server/events";
 
 
 const profileSchema = z.object({
@@ -36,6 +37,7 @@ export async function POST(request: Request) {
         }),
       { personId: input.personId },
     );
+    publishRosterChanged("zgt");
     return NextResponse.json({ ok: true });
   } catch (error) {
     return apiError(error);

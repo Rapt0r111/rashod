@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   filterListItems,
   sortListItems,
@@ -15,13 +15,14 @@ import {
 } from "@/features/schedule/logic";
 import type { Person } from "../../roster/types";
 import { abbreviateName, conscriptionLabel, getInitials } from "../../roster/utils";
+import { peopleAvailableOnAnyDate } from "../logic";
+import { fetchGroupCandidates } from "../api";
 import { Drawer } from "./drawer";
 import { EmptyState } from "./empty-state";
 
 export function PersonPickerPanel({
   title,
-  people,
-  candidatePeople = people,
+  groupId,
   availablePeopleByDate = {},
   initialDate,
   isBusy,
@@ -29,8 +30,7 @@ export function PersonPickerPanel({
   onPick,
 }: {
   title: string;
-  people: Person[];
-  candidatePeople?: Person[];
+  groupId: string;
   availablePeopleByDate?: Record<string, Person[]>;
   initialDate: string;
   onClose: () => void;
@@ -41,20 +41,47 @@ export function PersonPickerPanel({
   const [to, setTo] = useState(initialDate);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<ListSortState>({ key: "alpha", direction: "asc" });
+  const [fetchedByDate, setFetchedByDate] = useState<Record<string, Person[]>>({});
+  const [loading, setLoading] = useState(false);
   const dates = useMemo(() => scheduleDateRange(from, to), [from, to]);
+  const mergedByDate = useMemo(
+    () => ({ ...availablePeopleByDate, ...fetchedByDate }),
+    [availablePeopleByDate, fetchedByDate],
+  );
+
+  useEffect(() => {
+    if (!dates) return;
+    if (dates.every((date) => availablePeopleByDate[date] !== undefined || fetchedByDate[date] !== undefined)) {
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    void fetchGroupCandidates(groupId, from, to)
+      .then((result) => {
+        if (cancelled) return;
+        setFetchedByDate((current) => ({ ...current, ...result.availablePeopleByDate }));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setFetchedByDate((current) => {
+          const next = { ...current };
+          for (const date of dates) if (next[date] === undefined) next[date] = [];
+          return next;
+        });
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [availablePeopleByDate, dates, fetchedByDate, from, groupId, to]);
+
   const rangePeople = useMemo(() => {
     if (!dates) return [];
-    const datePeople = dates.map((date) => availablePeopleByDate[date]);
-    if (datePeople.every((items) => items !== undefined)) {
-      const availableIds = new Set(datePeople[0]?.map((person) => person.id) ?? []);
-      for (const items of datePeople.slice(1)) {
-        const ids = new Set(items?.map((person) => person.id) ?? []);
-        for (const id of availableIds) if (!ids.has(id)) availableIds.delete(id);
-      }
-      return candidatePeople.filter((person) => availableIds.has(person.id));
-    }
-    return dates.length === 1 ? people : candidatePeople;
-  }, [availablePeopleByDate, candidatePeople, dates, people]);
+    return peopleAvailableOnAnyDate(mergedByDate, dates) ?? [];
+  }, [dates, mergedByDate]);
+  const missingDates = Boolean(dates && peopleAvailableOnAnyDate(mergedByDate, dates) === null);
   const filtered = useMemo(
     () => sortListItems(
       filterListItems(rangePeople, query, (person) => `${person.rank} ${person.name} ${person.conscriptionNumber ?? ""}`),
@@ -123,7 +150,7 @@ export function PersonPickerPanel({
           ))}
         </div>
         <p className="m-0 text-xs leading-5 text-text-muted">
-          Назначение будет добавлено на {rangeLabel}. Нерабочие, исключённые, занятые или конфликтующие даты пропускаются с сохранением строгих правил.
+          Назначение будет добавлено на {rangeLabel}. Показаны люди, свободные хотя бы на одну дату периода. Нерабочие, исключённые, занятые или конфликтующие даты пропускаются.
         </p>
       </div>
       <SearchSortControl
@@ -138,8 +165,8 @@ export function PersonPickerPanel({
       <div className="grid gap-1.75">
         {filtered.length === 0 ? (
           <EmptyState
-            title={!dates ? "Выберите корректный период" : rangePeople.length === 0 ? "Нет кандидатов на выбранный период" : "Никого не найдено"}
-            text={!dates ? "Период должен быть от одной до 366 календарных дат." : rangePeople.length === 0 ? "Проверьте исключения и правила группы или выберите другой период." : "Измените поиск или правила кандидатов."}
+            title={!dates ? "Выберите корректный период" : loading || missingDates ? "Загружаем кандидатов" : rangePeople.length === 0 ? "Нет кандидатов на выбранный период" : "Никого не найдено"}
+            text={!dates ? "Период должен быть от одной до 366 календарных дат." : loading || missingDates ? "Список строится по выбранным датам, а не по сегодняшнему дню." : rangePeople.length === 0 ? "Проверьте исключения и правила группы или выберите другой период." : "Измените поиск или правила кандидатов."}
           />
         ) : filtered.map((person) => (
           <button
@@ -147,7 +174,7 @@ export function PersonPickerPanel({
             type="button"
             className="grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 rounded-[14px] border border-line bg-[oklch(100%_0_0/0.035)] p-2.25 text-left text-text-primary transition-[border-color,background,transform] duration-200 hover:border-accent-line hover:bg-[oklch(100%_0_0/0.065)] cursor-pointer active:translate-y-px"
             onClick={() => dates && onPick(person.id, from, to)}
-            disabled={isBusy}
+            disabled={isBusy || loading}
           >
             <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-accent-soft text-[11px] font-extrabold text-accent">{getInitials(person.name)}</span>
             <span className="grid min-w-0 gap-0.5">

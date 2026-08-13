@@ -36,7 +36,7 @@ export function ZgtHome({
     storageStats.lost;
 
   return (
-    <>
+    <div className="grid w-full min-w-0 gap-0">
       <PortalPageHeader
         title="ЗГТ"
         subtitle="Техника, телефоны и носители. Владельцы — из реестра Расхода."
@@ -44,36 +44,43 @@ export function ZgtHome({
       <ZgtNav activePath="/zgt" />
 
       <ZgtStatStrip
-        className="lg:grid-cols-4"
+        className="!grid-cols-2 sm:!grid-cols-4 lg:!grid-cols-4"
         items={[
           {
             id: "equipment",
             label: "Техника",
             value: equipmentStats.total,
             tone: equipmentStats.broken > 0 ? "red" : undefined,
+            href: "/zgt/equipment",
           },
           {
             id: "phones-in",
             label: "Телефоны сданы",
             value: phoneStats.checkedIn,
             tone: "green",
+            href: "/zgt/phones?status=checked_in",
           },
           {
             id: "phones-out",
             label: "Телефоны на руках",
             value: phoneStats.checkedOut,
             tone: phoneStats.checkedOut > 0 ? "amber" : undefined,
+            href: "/zgt/phones?status=checked_out",
           },
           {
             id: "attention",
             label: "Требуют внимания",
             value: attention,
             tone: attention > 0 ? "red" : "green",
+            href:
+              storageStats.broken + storageStats.lost > equipmentStats.repair + equipmentStats.broken
+                ? "/zgt/storage-items?status=broken"
+                : "/zgt/equipment?status=repair",
           },
         ]}
       />
 
-      <div className="grid gap-3 lg:grid-cols-3">
+      <div className="mt-3 grid w-full min-w-0 grid-cols-1 gap-3 md:grid-cols-3">
         <ModuleCard
           href="/zgt/equipment"
           icon={DesktopTowerIcon}
@@ -81,15 +88,13 @@ export function ZgtHome({
           description="ПЭВМ, ноутбуки, выдачи, перемещения и история."
           primaryAction="Открыть список"
           stats={[
-            { label: "В работе", value: equipmentStats.inUse, tone: "blue" },
+            { label: "В работе", value: equipmentStats.inUse, tone: "green" },
             { label: "Склад", value: equipmentStats.storage },
             {
               label: "Ремонт / брак",
               value: equipmentStats.repair + equipmentStats.broken,
               tone:
-                equipmentStats.repair + equipmentStats.broken > 0
-                  ? "red"
-                  : undefined,
+                equipmentStats.repair + equipmentStats.broken > 0 ? "red" : undefined,
             },
           ]}
         />
@@ -129,31 +134,12 @@ export function ZgtHome({
       </div>
 
       <section className="mt-4 rounded-2xl border border-line bg-bg-panel/80 p-4 sm:p-5">
-        <h2 className="m-0 text-base font-bold">Как устроен учёт</h2>
-        <ul className="mt-3 mb-0 grid gap-2 pl-5 text-sm leading-6 text-text-secondary">
-          <li>
-            Один вход портала, права{" "}
-            <code className="rounded-md bg-white/6 px-1.5 py-0.5 font-mono text-[12px]">
-              zgt:read
-            </code>{" "}
-            /{" "}
-            <code className="rounded-md bg-white/6 px-1.5 py-0.5 font-mono text-[12px]">
-              zgt:write
-            </code>
-          </li>
-          <li>
-            Владельцы и адресаты выдач — люди из реестра Расхода (
-            <code className="rounded-md bg-white/6 px-1.5 py-0.5 font-mono text-[12px]">
-              people
-            </code>
-            )
-          </li>
-          <li>
-            Статус человека общий:{" "}
-            <code className="rounded-md bg-white/6 px-1.5 py-0.5 font-mono text-[12px]">
-              people.location
-            </code>
-          </li>
+        <h2 className="m-0 text-base font-bold">Как работать</h2>
+        <ul className="mt-3 mb-0 grid list-none gap-2 p-0 text-sm leading-6 text-text-secondary">
+          <li>Отметьте строки в списке — появится панель выдачи, сдачи и перемещения.</li>
+          <li>Владельца и адресата выбирайте поиском по Расходу, не вводите ФИО вручную.</li>
+          <li>Для телефонов при сдаче укажите ячейку — так проще найти аппарат вечером.</li>
+          <li>Цифры сверху фильтруют список. Повторное нажатие снимает фильтр.</li>
         </ul>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link href="/portal" className={cx(zgtBtnSecondaryClass, "no-underline")}>
@@ -166,7 +152,7 @@ export function ZgtHome({
           ) : null}
         </div>
       </section>
-    </>
+    </div>
   );
 }
 
@@ -189,7 +175,7 @@ function ModuleCard({
     <Link
       href={href}
       prefetch
-      className="group flex min-h-52 flex-col rounded-2xl border border-line bg-bg-panel/80 p-4 no-underline text-inherit transition-[border-color,background-color] duration-150 hover:border-line-strong hover:bg-bg-raised/70 sm:p-5"
+      className="group flex min-h-48 flex-col rounded-2xl border border-line bg-bg-panel/80 p-4 no-underline text-inherit transition-[border-color,background-color] duration-150 hover:border-line-strong hover:bg-bg-raised/70 focus-visible:border-cyan focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_color-mix(in_oklch,var(--cyan)_22%,transparent)] sm:p-5"
     >
       <div className="flex items-start gap-3">
         <div className="grid h-11 w-11 shrink-0 place-items-center rounded-[13px] border border-line bg-bg-raised text-cyan">
@@ -203,16 +189,13 @@ function ModuleCard({
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-2">
+      <dl className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
         {stats.map((stat) => (
-          <div
-            key={stat.label}
-            className="rounded-[10px] border border-line bg-bg-raised/70 px-2 py-2"
-          >
-            <div className="text-xs font-semibold text-text-muted">{stat.label}</div>
-            <div
+          <div key={stat.label} className="min-w-16">
+            <dt className="text-xs font-semibold text-text-muted">{stat.label}</dt>
+            <dd
               className={cx(
-                "mt-0.5 font-mono text-lg font-bold tabular-nums",
+                "m-0 mt-0.5 font-mono text-lg font-bold tabular-nums",
                 stat.tone === "green" && "text-green",
                 stat.tone === "amber" && "text-amber",
                 stat.tone === "red" && "text-red",
@@ -220,10 +203,10 @@ function ModuleCard({
               )}
             >
               {stat.value}
-            </div>
+            </dd>
           </div>
         ))}
-      </div>
+      </dl>
 
       <div className="mt-auto flex items-center gap-1.5 pt-4 text-sm font-semibold text-cyan">
         {primaryAction}

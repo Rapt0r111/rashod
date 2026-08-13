@@ -151,8 +151,9 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
     try {
       const snapshot = await fetchJson<Snapshot>("/api/snapshot");
       dispatch({ type: "snapshot", snapshot, preserveUi });
-    } catch {
-      // SSE-driven refresh: keep last good snapshot; avoid unhandled rejection.
+      setActionError(null);
+    } catch (error) {
+      setActionError(getApiErrorMessage(error, "Не удалось обновить состав. Показаны последние данные."));
     }
   }, []);
 
@@ -161,9 +162,8 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
     if (flashTimer.current) clearTimeout(flashTimer.current);
   }, []);
 
-  useRealtimeDomain(["roster", "unknown"], () => {
-    void refreshSnapshot(true);
-  });
+  const activeSectionRef = useRef(state.ui.activeSection);
+  activeSectionRef.current = state.ui.activeSection;
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -189,7 +189,7 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
   }, []);
 
   const loadGroupsSnapshot = useCallback(() => {
-    if (!canReadGroups || groupsSnapshot || groupsRequestRef.current) return;
+    if (!canReadGroups || groupsRequestRef.current) return;
     setSectionLoadErrors((current) => ({ ...current, groups: undefined }));
     groupsRequestRef.current = import("../groups/api")
       .then(({ fetchGroupsSnapshot }) => fetchGroupsSnapshot())
@@ -203,10 +203,10 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
       .finally(() => {
         groupsRequestRef.current = null;
       });
-  }, [canReadGroups, groupsSnapshot]);
+  }, [canReadGroups]);
 
   const loadTasksSnapshot = useCallback(() => {
-    if (!canReadTasks || tasksSnapshot || tasksRequestRef.current) return;
+    if (!canReadTasks || tasksRequestRef.current) return;
     setSectionLoadErrors((current) => ({ ...current, tasks: undefined }));
     tasksRequestRef.current = import("../tasks/api")
       .then(({ fetchTasksSnapshot }) => fetchTasksSnapshot())
@@ -220,10 +220,10 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
       .finally(() => {
         tasksRequestRef.current = null;
       });
-  }, [canReadTasks, tasksSnapshot]);
+  }, [canReadTasks]);
 
   const loadScheduleSnapshot = useCallback(() => {
-    if (scheduleSnapshot || scheduleRequestRef.current) return;
+    if (scheduleRequestRef.current) return;
     setSectionLoadErrors((current) => ({ ...current, schedule: undefined }));
     scheduleRequestRef.current = import("../schedule/api")
       .then(({ fetchScheduleSnapshot }) => fetchScheduleSnapshot())
@@ -237,7 +237,23 @@ export function RosterApp({ initialSnapshot, permissions }: { initialSnapshot: S
       .finally(() => {
         scheduleRequestRef.current = null;
       });
-  }, [scheduleSnapshot]);
+  }, []);
+
+  useRealtimeDomain(["roster", "groups", "tasks", "unknown"], (event) => {
+    if (event.domain === "roster" || event.domain === "unknown") {
+      void refreshSnapshot(true);
+    }
+    if (event.domain === "groups" || event.domain === "unknown") {
+      setGroupsSnapshot(null);
+      setScheduleSnapshot(null);
+      if (activeSectionRef.current === "groups") loadGroupsSnapshot();
+      if (activeSectionRef.current === "schedule") loadScheduleSnapshot();
+    }
+    if (event.domain === "tasks" || event.domain === "unknown") {
+      setTasksSnapshot(null);
+      if (activeSectionRef.current === "tasks") loadTasksSnapshot();
+    }
+  });
 
   useEffect(() => {
     if (state.ui.activeSection === "groups") loadGroupsSnapshot();

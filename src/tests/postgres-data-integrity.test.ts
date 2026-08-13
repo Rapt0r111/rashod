@@ -27,13 +27,19 @@ describe("PostgreSQL data integrity normalization", () => {
         "0010_group_overlap_policy.sql",
         "0011_zgt_personnel_and_equipment.sql",
         "0012_zgt_phones_and_storage_items.sql",
+        "0013_phones_person_set_null.sql",
+        "0014_location_foreign_keys.sql",
       ]),
     );
     const idx10 = POSTGRES_MIGRATIONS.indexOf("0010_group_overlap_policy.sql");
     const idx11 = POSTGRES_MIGRATIONS.indexOf("0011_zgt_personnel_and_equipment.sql");
     const idx12 = POSTGRES_MIGRATIONS.indexOf("0012_zgt_phones_and_storage_items.sql");
+    const idx13 = POSTGRES_MIGRATIONS.indexOf("0013_phones_person_set_null.sql");
+    const idx14 = POSTGRES_MIGRATIONS.indexOf("0014_location_foreign_keys.sql");
     expect(idx11).toBeGreaterThan(idx10);
     expect(idx12).toBeGreaterThan(idx11);
+    expect(idx13).toBeGreaterThan(idx12);
+    expect(idx14).toBeGreaterThan(idx13);
     expect(migrationPath("/repo", "0010_group_overlap_policy.sql")).toContain("drizzle");
   });
 
@@ -51,6 +57,26 @@ describe("PostgreSQL data integrity normalization", () => {
     expect(rosterRepositorySource).toContain(
       "VALUES (${record.id}, ${record.key}, ${record.label}, ${record.sortOrder}, false)",
     );
+  });
+
+  it("unlinks phones before deleting a person and uses SET NULL like equipment", () => {
+    const migration = readFileSync(
+      resolve(process.cwd(), "drizzle/0013_phones_person_set_null.sql"),
+      "utf8",
+    );
+    expect(migration).toContain("ON DELETE SET NULL");
+    expect(migration).toContain("ALTER TABLE phones ALTER COLUMN person_id DROP NOT NULL");
+    expect(rosterRepositorySource).toContain("UPDATE phones");
+    expect(rosterRepositorySource).toContain("person_id = NULL");
+    expect(rosterRepositorySource).toContain("status = 'checked_in'");
+    expect(rosterRepositorySource).toContain("DELETE FROM people WHERE id = ${id} RETURNING id");
+    expect(rosterRepositorySource).toContain("INSERT INTO movement_logs");
+    const locationKeys = readFileSync(
+      resolve(process.cwd(), "drizzle/0014_location_foreign_keys.sql"),
+      "utf8",
+    );
+    expect(locationKeys).toContain("people_location_fkey");
+    expect(locationKeys).toContain("location_group_members_location_fkey");
   });
 
   it("hard-blocks DELETE of system locations and platoons", () => {

@@ -16,7 +16,10 @@ import {
   type GrantRole,
 } from "./policy";
 import { isSecureSessionCookie } from "./session-cookie";
+import { mapCreateUserFailure } from "./create-user-error";
 import type { AuthContext, RoleRecord, UserRecord } from "./types";
+
+export { mapCreateUserFailure } from "./create-user-error";
 
 export { isSecureSessionCookie } from "./session-cookie";
 export type { AuthContext, RoleRecord, UserRecord } from "./types";
@@ -425,9 +428,7 @@ export async function createUser(input: {
       await assignRoles(transaction, id, input.roleIds);
     });
   } catch (error) {
-    if (error instanceof Error && error.message === "ROLE_NOT_FOUND")
-      throw error;
-    throw new Error("USERNAME_EXISTS");
+    mapCreateUserFailure(error);
   }
   // Defer import to avoid cycles; setup-gate cache must drop after first user.
   const { invalidateHasUsersCache } = await import("@/server/cache/stable-data");

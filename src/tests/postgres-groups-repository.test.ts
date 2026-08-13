@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  GROUP_UPDATED_AT_LOCK_SQL,
   groupAssignmentIneligibility,
   normalizeActiveDays,
   normalizeStringArray,
@@ -32,6 +33,27 @@ describe("postgres groups repository normalization", () => {
     expect(repositorySource).toContain("${sql.json(rule.activeDays)}::jsonb");
     expect(repositorySource).not.toContain("${JSON.stringify(rule.enabledPlatoons)}::jsonb");
     expect(repositorySource).not.toContain("${JSON.stringify(rule.activeDays)}::jsonb");
+  });
+
+  it("locks group updates with millisecond truncation, not bigint rounding", () => {
+    expect(GROUP_UPDATED_AT_LOCK_SQL).toContain("date_trunc('milliseconds'");
+    expect(GROUP_UPDATED_AT_LOCK_SQL).toContain("FLOOR(");
+    expect(GROUP_UPDATED_AT_LOCK_SQL).not.toContain("::bigint");
+    expect(repositorySource).toContain(GROUP_UPDATED_AT_LOCK_SQL);
+    expect(repositorySource).not.toContain("(EXTRACT(EPOCH FROM updated_at) * 1000)::bigint");
+    const epochWithHalfMs = 1_700_000_000.0006;
+    expect(Math.round(epochWithHalfMs * 1000)).not.toBe(Math.trunc(epochWithHalfMs * 1000));
+    expect(Math.floor(epochWithHalfMs * 1000)).toBe(Math.trunc(epochWithHalfMs * 1000));
+  });
+
+  it("returns the real assignment id after ON CONFLICT and rematerializes only a named horizon", () => {
+    expect(repositorySource).toContain("ON CONFLICT (group_id, person_id, assigned_date) DO NOTHING");
+    expect(repositorySource).toContain("RETURNING id");
+    expect(repositorySource).toContain("if (id) rememberRotationAssignment");
+    expect(repositorySource).toContain("AND own.assigned_date BETWEEN");
+    expect(repositorySource).toContain("refreshPostgresAutomaticDutyAssignments(refreshDates[0], refreshDates[refreshDates.length - 1])");
+    expect(repositorySource).not.toContain("|| row.conflictState === \"warning\"");
+    expect(repositorySource).not.toContain("|| row.conflictState === \"allowed\"");
   });
 
   it("uses shared platoon filter and keeps conflict fallback for quota auto-fill", () => {
@@ -67,5 +89,12 @@ describe("manual group assignment eligibility", () => {
 
   it("treats an empty platoon list as unrestricted", () => {
     expect(groupAssignmentIneligibility({ ...eligible, enabledPlatoons: [] })).toBeNull();
+  });
+
+  it("rejects a duplicate same-day assignment with a mapped 409 instead of a silent success", () => {
+    expect(repositorySource).toContain('if (!options.skipInvalid) throw new Error("GROUP_ASSIGNMENT_ALREADY_EXISTS")');
+    expect(repositorySource).not.toContain(
+      'if (!options.skipInvalid) return { assigned: false, skipped: { date, reason: "already_assigned", conflicts: [] } }',
+    );
   });
 });

@@ -34,5 +34,11 @@ describe("group API error messages", () => {
         "Назначение не выполнено",
       ),
     ).toBe("На выбранную дату уже назначено нужное количество людей.");
+    expect(
+      getGroupErrorMessage(
+        new GroupApiError("GROUP_ASSIGNMENT_ALREADY_EXISTS", 409),
+        "Назначение не выполнено",
+      ),
+    ).toBe("Этот человек уже назначен в группу на выбранную дату.");
   });
 });

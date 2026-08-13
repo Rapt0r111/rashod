@@ -9,6 +9,7 @@ import {
   type GrantRole,
 } from "@/server/auth/policy";
 import { hasPermission, PERMISSIONS } from "@/features/auth/permissions";
+import { mapCreateUserFailure } from "@/server/auth/create-user-error";
 
 const administrator: GrantRole = {
   id: "role-administrator",
@@ -161,5 +162,14 @@ describe("assertCanSaveRole", () => {
         permissions: ["roster:read", "roster:write"],
       }),
     ).not.toThrow();
+  });
+
+  it("maps only unique-violation createUser failures to USERNAME_EXISTS", () => {
+    expect(() => mapCreateUserFailure(new Error("ROLE_NOT_FOUND"))).toThrow("ROLE_NOT_FOUND");
+    expect(() => mapCreateUserFailure(Object.assign(new Error("duplicate key"), { code: "23505" }))).toThrow(
+      "USERNAME_EXISTS",
+    );
+    const other = Object.assign(new Error("connection refused"), { code: "57P01" });
+    expect(() => mapCreateUserFailure(other)).toThrow("connection refused");
   });
 });

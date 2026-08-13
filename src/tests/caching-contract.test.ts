@@ -50,8 +50,17 @@ describe("caching contracts", () => {
     const chrome = read("src/features/portal/PortalChrome.tsx");
     expect(chrome).toContain("PortalShellContext");
     expect(chrome).toContain("if (nested) return");
+    expect(chrome).toContain('data-portal-shell=""');
+    expect(chrome).toContain("w-full min-w-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4");
+    expect(chrome).not.toContain("max-w-5xl");
+    expect(chrome).not.toContain("mx-auto w-full px-5");
+    expect(chrome).toContain("<RealtimeProvider>{children}</RealtimeProvider>");
+    expect(chrome).not.toContain("<RealtimeProvider>\n        <PortalShellFrame");
     expect(chrome).not.toContain("fullBleed");
     expect(chrome).not.toContain("chrome: false");
+    const globals = read("src/app/globals.css");
+    expect(globals).toContain("[data-portal-shell] [data-portal-shell]");
+    expect(globals).toContain("display: contents");
   });
 
   it("does not force a global loading.tsx spinner on every route change", () => {

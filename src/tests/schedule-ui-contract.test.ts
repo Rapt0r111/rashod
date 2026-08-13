@@ -25,7 +25,8 @@ describe("schedule UI integration contract", () => {
     expect(schedule).toContain("assignment.conflictState === \"warning\"");
     expect(route).toContain('requireAnyPermission(request, ["roster:read", "groups:read"])');
     expect(route).toContain("scheduleDateRange(from, to)");
-    expect(schedule).not.toContain("Сформировать автоматически");
+    expect(schedule).toContain("generateSchedule");
+    expect(schedule).toContain("Сформировать");
     expect(schedule).toContain("Обзор периода");
     expect(schedule).toContain("Назначить вручную");
     expect(schedule).toContain("assignSchedulePerson(editorGroupId, selectedPerson.id, cellTarget.date)");

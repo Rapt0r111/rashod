@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   ArrowRightIcon,
   DesktopTowerIcon,
@@ -9,6 +10,7 @@ import {
   TrashIcon,
 } from "@phosphor-icons/react";
 import { PortalPageHeader } from "@/features/portal/PortalChrome";
+import { useRealtimeDomain } from "@/features/realtime/RealtimeProvider";
 import type { Permission } from "@/features/auth/permissions";
 import { hasPermission } from "@/features/auth/permissions";
 import {
@@ -40,17 +42,22 @@ import {
   ZgtAlert,
   ZgtBatchBar,
   ZgtCheckbox,
+  ZgtConfirmDialog,
   ZgtDataPanel,
   ZgtDialog,
   ZgtEmptyState,
   ZgtField,
+  ZgtFormSection,
   ZgtIconButton,
   ZgtInput,
+  ZgtListLayout,
+  ZgtMobileCard,
   ZgtPagination,
   ZgtPersonSearch,
   ZgtSearchField,
   ZgtSelectField,
   ZgtStatStrip,
+  ZgtToggleChip,
   ZgtToolbar,
   zgtBtnGhostClass,
   zgtBtnPrimaryClass,
@@ -85,6 +92,13 @@ function statusTone(status: EquipmentStatus) {
   return EQUIPMENT_STATUSES.find((item) => item.value === status)?.tone ?? "neutral";
 }
 
+function readKnownStatus(value: string | null): EquipmentStatus | "" {
+  if (EQUIPMENT_STATUSES.some((item) => item.value === value)) {
+    return value as EquipmentStatus;
+  }
+  return "";
+}
+
 export function EquipmentApp({
   permissions,
   initialData,
@@ -93,15 +107,20 @@ export function EquipmentApp({
   initialData: EquipmentListResult;
 }) {
   const canWrite = hasPermission({ permissions: [...permissions] }, "zgt:write");
+  const searchParams = useSearchParams();
 
   const [data, setData] = useState(initialData);
   const [q, setQ] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState<string>(() =>
+    readKnownStatus(searchParams.get("status")),
+  );
   const [category, setCategory] = useState("");
   const [location, setLocation] = useState("");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -112,6 +131,8 @@ export function EquipmentApp({
   const [batchPersonId, setBatchPersonId] = useState<string | null>(null);
   const [batchPersonQuery, setBatchPersonQuery] = useState("");
   const [pending, setPending] = useState(false);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   const filtersActive = Boolean(q || status || category || location);
 
@@ -144,6 +165,10 @@ export function EquipmentApp({
     }, 250);
     return () => window.clearTimeout(handle);
   }, [q, status, category, location]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useRealtimeDomain(["zgt", "unknown"], () => {
+    void reload(page);
+  });
 
   const allVisibleSelected =
     data.items.length > 0 && data.items.every((item) => selected.has(item.id));
@@ -181,6 +206,7 @@ export function EquipmentApp({
     setEditingId(null);
     setForm(emptyForm());
     setPersonQuery("");
+    setFormError(null);
     setEditorOpen(true);
   }
 
@@ -209,7 +235,8 @@ export function EquipmentApp({
       isMouseWorking: item.isMouseWorking,
       hasBag: item.hasBag,
     });
-    setPersonQuery(item.personName ?? "");
+    setPersonQuery(item.personName ? `${item.personRank ?? ""} ${item.personName}`.trim() : "");
+    setFormError(null);
     setEditorOpen(true);
   }
 
@@ -223,35 +250,38 @@ export function EquipmentApp({
 
   async function saveForm() {
     if (!form.displayName.trim()) {
-      setError("Укажите название техники");
+      setFormError("Укажите название техники");
       return;
     }
     setPending(true);
-    setError(null);
+    setFormError(null);
     try {
       if (editingId) await updateEquipmentItem(editingId, form);
       else await createEquipmentItem(form);
       setEditorOpen(false);
       setSelected(new Set());
+      setNotice(editingId ? "Карточка техники обновлена" : "Техника добавлена");
       await reload(page);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Не удалось сохранить");
+      setFormError(cause instanceof Error ? cause.message : "Не удалось сохранить");
     } finally {
       setPending(false);
     }
   }
 
-  async function removeItem(id: string, name: string) {
-    if (!confirm(`Удалить «${name}»?`)) return;
+  async function removeItem() {
+    if (!deleteTarget) return;
     setPending(true);
     try {
-      await deleteEquipmentItem(id);
+      await deleteEquipmentItem(deleteTarget.id);
       setSelected((current) => {
         const next = new Set(current);
-        next.delete(id);
+        next.delete(deleteTarget.id);
         return next;
       });
-      if (detail?.id === id) setDetail(null);
+      if (detail?.id === deleteTarget.id) setDetail(null);
+      setNotice(`«${deleteTarget.name}» удалена`);
+      setDeleteTarget(null);
       await reload(page);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Не удалось удалить");
@@ -262,7 +292,16 @@ export function EquipmentApp({
 
   async function runBatch(kind: "issue" | "return" | "move") {
     if (!selected.size) return;
+    if (kind === "move" && !batchLocation.trim()) {
+      setError("Укажите местоположение для перемещения");
+      return;
+    }
+    if (kind === "issue" && !batchPersonId && !batchLocation.trim()) {
+      setError("Укажите человека или местоположение для выдачи");
+      return;
+    }
     setPending(true);
+    setPendingAction(kind);
     setError(null);
     try {
       const ids = [...selected];
@@ -272,14 +311,13 @@ export function EquipmentApp({
           toPersonId: batchPersonId,
           toLocation: batchLocation || undefined,
         });
+        setNotice(`Выдано: ${ids.length}`);
       } else if (kind === "return") {
         await batchReturn({ ids });
+        setNotice(`Сдано: ${ids.length}`);
       } else {
-        if (!batchLocation.trim()) {
-          setError("Укажите местоположение для перемещения");
-          return;
-        }
         await batchMove({ ids, toLocation: batchLocation.trim() });
+        setNotice(`Перемещено: ${ids.length}`);
       }
       setSelected(new Set());
       setBatchPersonId(null);
@@ -290,6 +328,7 @@ export function EquipmentApp({
       setError(cause instanceof Error ? cause.message : "Ошибка массовой операции");
     } finally {
       setPending(false);
+      setPendingAction(null);
     }
   }
 
@@ -305,13 +344,14 @@ export function EquipmentApp({
         id: "in_use",
         label: "В работе",
         value: data.stats.inUse,
-        tone: "blue",
+        tone: "green",
         active: status === "in_use",
       },
       {
         id: "storage",
         label: "На складе",
         value: data.stats.storage,
+        tone: "blue",
         active: status === "storage",
       },
       {
@@ -332,6 +372,22 @@ export function EquipmentApp({
     [data.stats, status],
   );
 
+  const rowActions = (item: EquipmentRecord) =>
+    canWrite ? (
+      <>
+        <ZgtIconButton label="Изменить" onClick={() => openEdit(item)}>
+          <PencilSimpleIcon size={16} aria-hidden />
+        </ZgtIconButton>
+        <ZgtIconButton
+          label="Удалить"
+          className="text-red hover:text-red"
+          onClick={() => setDeleteTarget({ id: item.id, name: item.displayName })}
+        >
+          <TrashIcon size={16} aria-hidden />
+        </ZgtIconButton>
+      </>
+    ) : null;
+
   return (
     <>
       <PortalPageHeader
@@ -345,7 +401,16 @@ export function EquipmentApp({
         onSelect={(id) => setStatus((current) => (current === id ? "" : id))}
       />
 
-      <ZgtToolbar>
+      <ZgtToolbar
+        actions={
+          canWrite ? (
+            <button type="button" className={zgtBtnPrimaryClass} onClick={openCreate}>
+              <PlusIcon size={16} weight="bold" aria-hidden />
+              Добавить
+            </button>
+          ) : null
+        }
+      >
         <ZgtSearchField
           value={q}
           onChange={setQ}
@@ -379,12 +444,6 @@ export function EquipmentApp({
             Сбросить фильтры
           </button>
         ) : null}
-        {canWrite ? (
-          <button type="button" className={zgtBtnPrimaryClass} onClick={openCreate}>
-            <PlusIcon size={16} weight="bold" aria-hidden />
-            Добавить
-          </button>
-        ) : null}
       </ZgtToolbar>
 
       {canWrite && selected.size > 0 ? (
@@ -411,11 +470,11 @@ export function EquipmentApp({
           </ZgtField>
           <button
             type="button"
-            className={zgtBtnSecondaryClass}
-            disabled={pending}
+            className={zgtBtnPrimaryClass}
+            disabled={pending || (!batchPersonId && !batchLocation.trim())}
             onClick={() => void runBatch("issue")}
           >
-            Выдать
+            {pendingAction === "issue" ? "Выдача…" : "Выдать"}
           </button>
           <button
             type="button"
@@ -423,23 +482,26 @@ export function EquipmentApp({
             disabled={pending}
             onClick={() => void runBatch("return")}
           >
-            Сдать
+            {pendingAction === "return" ? "Сдача…" : "Сдать"}
           </button>
           <button
             type="button"
             className={zgtBtnSecondaryClass}
-            disabled={pending}
+            disabled={pending || !batchLocation.trim()}
             onClick={() => void runBatch("move")}
           >
-            Переместить
+            {pendingAction === "move" ? "Перемещение…" : "Переместить"}
           </button>
         </ZgtBatchBar>
       ) : null}
 
       {error ? <ZgtAlert message={error} onDismiss={() => setError(null)} /> : null}
+      {notice ? (
+        <ZgtAlert message={notice} tone="success" onDismiss={() => setNotice(null)} />
+      ) : null}
 
       <ZgtDataPanel
-        title="Список"
+        title="Техника"
         total={data.total}
         loading={loading}
         footer={
@@ -477,101 +539,144 @@ export function EquipmentApp({
             }
           />
         ) : (
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-white/[0.03] text-xs font-semibold text-text-muted">
-              <tr>
+          <ZgtListLayout
+            table={
+              <table className="min-w-full text-left text-sm">
+                <thead className="sticky top-0 bg-bg-panel text-xs font-semibold text-text-muted">
+                  <tr>
+                    {canWrite ? (
+                      <th className="w-12 px-2 py-2 font-semibold">
+                        <ZgtCheckbox
+                          checked={allVisibleSelected}
+                          indeterminate={someVisibleSelected}
+                          onChange={toggleAllVisible}
+                          label="Выбрать все на странице"
+                        />
+                      </th>
+                    ) : null}
+                    <th className="px-3 py-2 font-semibold">Название</th>
+                    <th className="px-3 py-2 font-semibold">Инв. №</th>
+                    <th className="px-3 py-2 font-semibold">Статус</th>
+                    <th className="px-3 py-2 font-semibold">Владелец</th>
+                    <th className="px-3 py-2 font-semibold">Место</th>
+                    <th className="px-3 py-2 font-semibold">
+                      <span className="sr-only">Действия</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.items.map((item) => (
+                    <tr
+                      key={item.id}
+                      className="border-t border-line/80 transition-colors duration-150 hover:bg-white/[0.025]"
+                    >
+                      {canWrite ? (
+                        <td className="px-2 py-1.5">
+                          <ZgtCheckbox
+                            checked={selected.has(item.id)}
+                            onChange={() => toggle(item.id)}
+                            label={`Выбрать ${item.displayName}`}
+                          />
+                        </td>
+                      ) : null}
+                      <td className="px-3 py-2.5">
+                        <button
+                          type="button"
+                          className="cursor-pointer text-left font-semibold text-text-primary transition-colors hover:text-cyan"
+                          onClick={() => void openDetail(item.id)}
+                        >
+                          {item.displayName}
+                        </button>
+                        <div className="text-xs text-text-muted">
+                          {deviceTypeLabel(item.deviceType)}
+                          {!item.isWorking ? " · неисправен" : ""}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5 font-mono text-xs tabular-nums">
+                        {item.inventoryNumber || "—"}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <StatusBadge
+                          label={statusLabel(item.status)}
+                          tone={statusTone(item.status)}
+                        />
+                      </td>
+                      <td className="px-3 py-2.5 text-text-secondary">
+                        {item.personName ? (
+                          <>
+                            <div>{item.personName}</div>
+                            <div className="text-xs text-text-muted">{item.personRank}</div>
+                          </>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-text-secondary">
+                        {item.location || "—"}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {canWrite ? (
+                          <div className="flex justify-end gap-1">{rowActions(item)}</div>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            }
+            cards={
+              <div>
                 {canWrite ? (
-                  <th className="w-12 px-2 py-2 font-semibold">
+                  <div className="flex items-center gap-2 border-b border-line px-3 py-2">
                     <ZgtCheckbox
                       checked={allVisibleSelected}
                       indeterminate={someVisibleSelected}
                       onChange={toggleAllVisible}
                       label="Выбрать все на странице"
                     />
-                  </th>
+                    <span className="text-xs font-semibold text-text-muted">Выбрать все на странице</span>
+                  </div>
                 ) : null}
-                <th className="px-3 py-2 font-semibold">Название</th>
-                <th className="px-3 py-2 font-semibold">Инв. №</th>
-                <th className="px-3 py-2 font-semibold">Статус</th>
-                <th className="px-3 py-2 font-semibold">Владелец</th>
-                <th className="px-3 py-2 font-semibold">Место</th>
-                <th className="px-3 py-2 font-semibold">
-                  <span className="sr-only">Действия</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((item) => (
-                <tr
-                  key={item.id}
-                  className="border-t border-line/80 transition-colors duration-150 hover:bg-white/[0.025]"
-                >
-                  {canWrite ? (
-                    <td className="px-2 py-1.5">
-                      <ZgtCheckbox
-                        checked={selected.has(item.id)}
-                        onChange={() => toggle(item.id)}
-                        label={`Выбрать ${item.displayName}`}
-                      />
-                    </td>
-                  ) : null}
-                  <td className="px-3 py-2.5">
-                    <button
-                      type="button"
-                      className="cursor-pointer text-left font-semibold text-text-primary transition-colors hover:text-cyan"
-                      onClick={() => void openDetail(item.id)}
-                    >
-                      {item.displayName}
-                    </button>
-                    <div className="text-xs text-text-muted">
-                      {deviceTypeLabel(item.deviceType)}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2.5 font-mono text-xs tabular-nums">
-                    {item.inventoryNumber || "—"}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <StatusBadge
-                      label={statusLabel(item.status)}
-                      tone={statusTone(item.status)}
-                    />
-                  </td>
-                  <td className="px-3 py-2.5 text-text-secondary">
-                    {item.personName ? (
-                      <>
-                        <div>{item.personName}</div>
-                        <div className="text-xs text-text-muted">{item.personRank}</div>
-                      </>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5 text-text-secondary">
-                    {item.location || "—"}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    {canWrite ? (
-                      <div className="flex justify-end gap-1">
-                        <ZgtIconButton
-                          label="Изменить"
-                          onClick={() => openEdit(item)}
-                        >
-                          <PencilSimpleIcon size={16} aria-hidden />
-                        </ZgtIconButton>
-                        <ZgtIconButton
-                          label="Удалить"
-                          className="text-red hover:text-red"
-                          onClick={() => void removeItem(item.id, item.displayName)}
-                        >
-                          <TrashIcon size={16} aria-hidden />
-                        </ZgtIconButton>
-                      </div>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                {data.items.map((item) => (
+                  <ZgtMobileCard
+                    key={item.id}
+                    leading={
+                      canWrite ? (
+                        <ZgtCheckbox
+                          checked={selected.has(item.id)}
+                          onChange={() => toggle(item.id)}
+                          label={`Выбрать ${item.displayName}`}
+                        />
+                      ) : null
+                    }
+                    title={item.displayName}
+                    subtitle={`${deviceTypeLabel(item.deviceType)}${item.isWorking ? "" : " · неисправен"}`}
+                    onOpen={() => void openDetail(item.id)}
+                    fields={[
+                      { label: "Инв. №", value: item.inventoryNumber || "—" },
+                      {
+                        label: "Статус",
+                        value: (
+                          <StatusBadge
+                            label={statusLabel(item.status)}
+                            tone={statusTone(item.status)}
+                          />
+                        ),
+                      },
+                      {
+                        label: "Владелец",
+                        value: item.personName
+                          ? `${item.personRank ?? ""} ${item.personName}`.trim()
+                          : "—",
+                      },
+                      { label: "Место", value: item.location || "—" },
+                    ]}
+                    actions={rowActions(item)}
+                  />
+                ))}
+              </div>
+            }
+          />
         )}
       </ZgtDataPanel>
 
@@ -582,140 +687,192 @@ export function EquipmentApp({
         onClose={() => setEditorOpen(false)}
         wide
       >
-        <div className="grid gap-3 sm:grid-cols-2">
-          <ZgtSelectField
-            label="Тип"
-            value={form.deviceType}
-            onChange={(value) =>
-              setForm((f) => ({
-                ...f,
-                deviceType: value as EquipmentFormValues["deviceType"],
-              }))
-            }
-          >
-            {DEVICE_TYPES.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </ZgtSelectField>
-          <ZgtSelectField
-            label="Статус"
-            value={form.status}
-            onChange={(value) =>
-              setForm((f) => ({ ...f, status: value as EquipmentStatus }))
-            }
-          >
-            {EQUIPMENT_STATUSES.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </ZgtSelectField>
-          <ZgtField label="Название" required className="sm:col-span-2">
-            <ZgtInput
-              value={form.displayName}
-              onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))}
-              required
-            />
-          </ZgtField>
-          <ZgtField label="Инв. №">
-            <ZgtInput
-              value={form.inventoryNumber ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, inventoryNumber: e.target.value }))}
-            />
-          </ZgtField>
-          <ZgtField label="Серийный №">
-            <ZgtInput
-              value={form.serialNumber ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, serialNumber: e.target.value }))}
-            />
-          </ZgtField>
-          <ZgtField label="МНИ №">
-            <ZgtInput
-              value={form.mniSerialNumber ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, mniSerialNumber: e.target.value }))}
-            />
-          </ZgtField>
-          <ZgtField label="Местоположение">
-            <ZgtInput
-              value={form.location ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-            />
-          </ZgtField>
-          <ZgtField label="Производитель">
-            <ZgtInput
-              value={form.manufacturer ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, manufacturer: e.target.value }))}
-            />
-          </ZgtField>
-          <ZgtField label="Модель">
-            <ZgtInput
-              value={form.model ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
-            />
-          </ZgtField>
-          <ZgtField label="CPU">
-            <ZgtInput
-              value={form.cpu ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, cpu: e.target.value }))}
-            />
-          </ZgtField>
-          <ZgtField label="ОС">
-            <ZgtInput
-              value={form.os ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, os: e.target.value }))}
-            />
-          </ZgtField>
-          <ZgtField label="RAM, ГБ">
-            <ZgtInput
-              type="number"
-              min={1}
-              value={form.ramGb ?? ""}
-              onChange={(e) =>
+        {formError ? <ZgtAlert message={formError} onDismiss={() => setFormError(null)} /> : null}
+        <div className="grid gap-3">
+          <ZgtFormSection title="Основное">
+            <ZgtSelectField
+              label="Тип"
+              value={form.deviceType}
+              onChange={(value) =>
                 setForm((f) => ({
                   ...f,
-                  ramGb: e.target.value ? Number(e.target.value) : null,
+                  deviceType: value as EquipmentFormValues["deviceType"],
                 }))
               }
-            />
-          </ZgtField>
-          <ZgtField label="Диск, ГБ">
-            <ZgtInput
-              type="number"
-              min={1}
-              value={form.storageGb ?? ""}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  storageGb: e.target.value ? Number(e.target.value) : null,
-                }))
+            >
+              {DEVICE_TYPES.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </ZgtSelectField>
+            <ZgtSelectField
+              label="Статус"
+              value={form.status}
+              onChange={(value) =>
+                setForm((f) => ({ ...f, status: value as EquipmentStatus }))
               }
-            />
-          </ZgtField>
-          <div className="sm:col-span-2">
-            <ZgtPersonSearch
-              query={personQuery}
-              onQueryChange={setPersonQuery}
-              selectedId={form.personId}
-              onSelect={(person) => {
-                setForm((f) => ({ ...f, personId: person.id }));
-                setPersonQuery(`${person.rank} ${person.name}`);
-                setBatchPersonId(person.id);
-                setBatchPersonQuery(`${person.rank} ${person.name}`);
-              }}
-              onClear={() => setForm((f) => ({ ...f, personId: null }))}
-            />
-          </div>
-          <label className="flex min-h-[42px] items-center gap-2 text-sm sm:col-span-2">
-            <input
-              type="checkbox"
-              className="h-4 w-4 accent-[var(--cyan)]"
+            >
+              {EQUIPMENT_STATUSES.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </ZgtSelectField>
+            <ZgtField label="Название" required className="sm:col-span-2">
+              <ZgtInput
+                value={form.displayName}
+                onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))}
+                required
+              />
+            </ZgtField>
+            <ZgtToggleChip
+              label="Исправен"
               checked={form.isWorking}
-              onChange={(e) => setForm((f) => ({ ...f, isWorking: e.target.checked }))}
+              onChange={(checked) => setForm((f) => ({ ...f, isWorking: checked }))}
             />
-            Исправен
-          </label>
+          </ZgtFormSection>
+
+          <ZgtFormSection title="Идентификация">
+            <ZgtField label="Инв. №">
+              <ZgtInput
+                value={form.inventoryNumber ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, inventoryNumber: e.target.value }))}
+              />
+            </ZgtField>
+            <ZgtField label="Серийный №">
+              <ZgtInput
+                value={form.serialNumber ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, serialNumber: e.target.value }))}
+              />
+            </ZgtField>
+            <ZgtField label="МНИ №">
+              <ZgtInput
+                value={form.mniSerialNumber ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, mniSerialNumber: e.target.value }))}
+              />
+            </ZgtField>
+            <ZgtField label="Местоположение">
+              <ZgtInput
+                value={form.location ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+              />
+            </ZgtField>
+          </ZgtFormSection>
+
+          <ZgtFormSection title="Характеристики">
+            <ZgtField label="Производитель">
+              <ZgtInput
+                value={form.manufacturer ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, manufacturer: e.target.value }))}
+              />
+            </ZgtField>
+            <ZgtField label="Модель">
+              <ZgtInput
+                value={form.model ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
+              />
+            </ZgtField>
+            <ZgtField label="CPU">
+              <ZgtInput
+                value={form.cpu ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, cpu: e.target.value }))}
+              />
+            </ZgtField>
+            <ZgtField label="ОС">
+              <ZgtInput
+                value={form.os ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, os: e.target.value }))}
+              />
+            </ZgtField>
+            <ZgtField label="RAM, ГБ">
+              <ZgtInput
+                type="number"
+                min={1}
+                value={form.ramGb ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    ramGb: e.target.value ? Number(e.target.value) : null,
+                  }))
+                }
+              />
+            </ZgtField>
+            <ZgtField label="Диск, ГБ">
+              <ZgtInput
+                type="number"
+                min={1}
+                value={form.storageGb ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    storageGb: e.target.value ? Number(e.target.value) : null,
+                  }))
+                }
+              />
+            </ZgtField>
+          </ZgtFormSection>
+
+          <ZgtFormSection title="Владелец">
+            <div className="sm:col-span-2">
+              <ZgtPersonSearch
+                query={personQuery}
+                onQueryChange={setPersonQuery}
+                selectedId={form.personId}
+                onSelect={(person) => {
+                  setForm((f) => ({ ...f, personId: person.id }));
+                  setPersonQuery(`${person.rank} ${person.name}`);
+                }}
+                onClear={() => setForm((f) => ({ ...f, personId: null }))}
+              />
+            </div>
+          </ZgtFormSection>
+
+          <ZgtFormSection title="Комплект">
+            <div className="col-span-full flex flex-wrap gap-2">
+              <ZgtToggleChip
+                label="Зарядка"
+                checked={Boolean(form.hasCharger)}
+                onChange={(checked) =>
+                  setForm((f) => ({
+                    ...f,
+                    hasCharger: checked,
+                    isChargerWorking: checked ? (f.isChargerWorking ?? true) : null,
+                  }))
+                }
+              />
+              {form.hasCharger ? (
+                <ZgtToggleChip
+                  label="Зарядка исправна"
+                  checked={Boolean(form.isChargerWorking)}
+                  onChange={(checked) => setForm((f) => ({ ...f, isChargerWorking: checked }))}
+                />
+              ) : null}
+              <ZgtToggleChip
+                label="Мышь"
+                checked={Boolean(form.hasMouse)}
+                onChange={(checked) =>
+                  setForm((f) => ({
+                    ...f,
+                    hasMouse: checked,
+                    isMouseWorking: checked ? (f.isMouseWorking ?? true) : null,
+                  }))
+                }
+              />
+              {form.hasMouse ? (
+                <ZgtToggleChip
+                  label="Мышь исправна"
+                  checked={Boolean(form.isMouseWorking)}
+                  onChange={(checked) => setForm((f) => ({ ...f, isMouseWorking: checked }))}
+                />
+              ) : null}
+              <ZgtToggleChip
+                label="Сумка"
+                checked={Boolean(form.hasBag)}
+                onChange={(checked) => setForm((f) => ({ ...f, hasBag: checked }))}
+              />
+            </div>
+          </ZgtFormSection>
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <button
@@ -766,6 +923,17 @@ export function EquipmentApp({
                 label="RAM"
                 value={detail.ramGb ? `${detail.ramGb} ГБ` : "—"}
               />
+              <InfoTile label="Исправность" value={detail.isWorking ? "Исправен" : "Неисправен"} />
+              <InfoTile
+                label="Комплект"
+                value={[
+                  detail.hasCharger ? "зарядка" : null,
+                  detail.hasMouse ? "мышь" : null,
+                  detail.hasBag ? "сумка" : null,
+                ]
+                  .filter(Boolean)
+                  .join(", ") || "—"}
+              />
             </dl>
             <h3 className="mb-2 mt-5 text-sm font-bold">История перемещений</h3>
             {detail.transfers.length === 0 ? (
@@ -811,6 +979,19 @@ export function EquipmentApp({
           </>
         ) : null}
       </ZgtDialog>
+
+      <ZgtConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Удалить технику?"
+        text={
+          deleteTarget
+            ? `«${deleteTarget.name}» будет удалена без возможности отмены.`
+            : ""
+        }
+        pending={pending}
+        onConfirm={() => void removeItem()}
+        onClose={() => setDeleteTarget(null)}
+      />
     </>
   );
 }

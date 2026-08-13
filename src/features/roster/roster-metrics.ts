@@ -4,14 +4,13 @@ import { locationLabel, locationToken } from "./utils";
 /** Keys that count as "налицо / в расположении". Default: only rota. */
 export const DEFAULT_PRESENT_LOCATION_KEYS = ["rota"] as const;
 
-/** Resolve present keys from location directory; fall back to rota if none flagged. */
+/** Resolve present keys from the location directory. Empty means nothing counts as present. */
 export function presentLocationKeys(
   locations: LocationOption[],
 ): readonly string[] {
-  const keys = locations
+  return locations
     .filter((location) => location.countsAsPresent)
     .map((location) => location.key);
-  return keys.length > 0 ? keys : DEFAULT_PRESENT_LOCATION_KEYS;
 }
 
 export type RosterBalance = {

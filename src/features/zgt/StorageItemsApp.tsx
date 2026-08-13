@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   PencilSimpleIcon,
   PlusIcon,
@@ -8,6 +9,7 @@ import {
   UsbIcon,
 } from "@phosphor-icons/react";
 import { PortalPageHeader } from "@/features/portal/PortalChrome";
+import { useRealtimeDomain } from "@/features/realtime/RealtimeProvider";
 import { hasPermission, type Permission } from "@/features/auth/permissions";
 import { ZgtNav } from "./ZgtNav";
 import {
@@ -26,12 +28,16 @@ import {
   ZgtAlert,
   ZgtBatchBar,
   ZgtCheckbox,
+  ZgtConfirmDialog,
   ZgtDataPanel,
   ZgtDialog,
   ZgtEmptyState,
   ZgtField,
+  ZgtFormSection,
   ZgtIconButton,
   ZgtInput,
+  ZgtListLayout,
+  ZgtMobileCard,
   ZgtPagination,
   ZgtPersonSearch,
   ZgtSearchField,
@@ -59,6 +65,13 @@ function statusTone(status: StorageItemStatus) {
   return STORAGE_ITEM_STATUSES.find((item) => item.value === status)?.tone ?? "blue";
 }
 
+function readKnownStatus(value: string | null): StorageItemStatus | "" {
+  if (STORAGE_ITEM_STATUSES.some((item) => item.value === value)) {
+    return value as StorageItemStatus;
+  }
+  return "";
+}
+
 async function postItem(body: unknown) {
   const response = await fetch("/api/zgt/storage-items", {
     method: "POST",
@@ -80,14 +93,19 @@ export function StorageItemsApp({
   initialData: StorageItemListResult;
 }) {
   const canWrite = hasPermission({ permissions: [...permissions] }, "zgt:write");
+  const searchParams = useSearchParams();
 
   const [data, setData] = useState(initialData);
   const [q, setQ] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState<string>(() =>
+    readKnownStatus(searchParams.get("status")),
+  );
   const [type, setType] = useState("");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -96,6 +114,8 @@ export function StorageItemsApp({
   const [issuePersonId, setIssuePersonId] = useState<string | null>(null);
   const [issuePersonQuery, setIssuePersonQuery] = useState("");
   const [pending, setPending] = useState(false);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   const filtersActive = Boolean(q || status || type);
 
@@ -127,6 +147,10 @@ export function StorageItemsApp({
     const handle = window.setTimeout(() => void reload(1), 250);
     return () => window.clearTimeout(handle);
   }, [q, status, type]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useRealtimeDomain(["zgt", "unknown"], () => {
+    void reload(page);
+  });
 
   const allVisibleSelected =
     data.items.length > 0 && data.items.every((item) => selected.has(item.id));
@@ -163,6 +187,7 @@ export function StorageItemsApp({
     setEditingId(null);
     setForm(emptyForm());
     setPersonQuery("");
+    setFormError(null);
     setEditorOpen(true);
   }
 
@@ -181,34 +206,41 @@ export function StorageItemsApp({
     setPersonQuery(
       item.personName ? `${item.personRank ?? ""} ${item.personName}`.trim() : "",
     );
+    setFormError(null);
     setEditorOpen(true);
   }
 
+  const itemLabel = (item: StorageItemRecord) =>
+    item.inventoryNumber || storageItemTypeLabel(item.type);
+
   async function saveForm() {
     setPending(true);
-    setError(null);
+    setFormError(null);
     try {
       if (editingId) await postItem({ action: "update", id: editingId, data: form });
       else await postItem({ action: "create", data: form });
       setEditorOpen(false);
+      setNotice(editingId ? "Запись обновлена" : "Носитель добавлен");
       await reload(page);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Не удалось сохранить");
+      setFormError(cause instanceof Error ? cause.message : "Не удалось сохранить");
     } finally {
       setPending(false);
     }
   }
 
-  async function removeItem(id: string, label: string) {
-    if (!confirm(`Удалить «${label}»?`)) return;
+  async function removeItem() {
+    if (!deleteTarget) return;
     setPending(true);
     try {
-      await postItem({ action: "delete", id });
+      await postItem({ action: "delete", id: deleteTarget.id });
       setSelected((current) => {
         const next = new Set(current);
-        next.delete(id);
+        next.delete(deleteTarget.id);
         return next;
       });
+      setNotice(`«${deleteTarget.name}» удалён`);
+      setDeleteTarget(null);
       await reload(page);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Не удалось удалить");
@@ -219,21 +251,24 @@ export function StorageItemsApp({
 
   async function runBatch(kind: "issue" | "return") {
     if (!selected.size) return;
+    if (kind === "issue" && !issuePersonId) {
+      setError("Выберите человека из Расхода для выдачи");
+      return;
+    }
     setPending(true);
+    setPendingAction(kind);
     setError(null);
     try {
       const ids = [...selected];
       if (kind === "issue") {
-        if (!issuePersonId) {
-          setError("Выберите человека из Расхода для выдачи");
-          return;
-        }
         await postItem({
           action: "batch-issue",
           data: { ids, toPersonId: issuePersonId },
         });
+        setNotice(`Выдано: ${ids.length}`);
       } else {
         await postItem({ action: "batch-return", data: { ids } });
+        setNotice(`Возвращено: ${ids.length}`);
       }
       setSelected(new Set());
       setIssuePersonId(null);
@@ -243,6 +278,7 @@ export function StorageItemsApp({
       setError(cause instanceof Error ? cause.message : "Ошибка массовой операции");
     } finally {
       setPending(false);
+      setPendingAction(null);
     }
   }
 
@@ -280,6 +316,22 @@ export function StorageItemsApp({
     [data.stats, status],
   );
 
+  const rowActions = (item: StorageItemRecord) =>
+    canWrite ? (
+      <>
+        <ZgtIconButton label="Изменить" onClick={() => openEdit(item)}>
+          <PencilSimpleIcon size={16} aria-hidden />
+        </ZgtIconButton>
+        <ZgtIconButton
+          label="Удалить"
+          className="text-red hover:text-red"
+          onClick={() => setDeleteTarget({ id: item.id, name: itemLabel(item) })}
+        >
+          <TrashIcon size={16} aria-hidden />
+        </ZgtIconButton>
+      </>
+    ) : null;
+
   return (
     <>
       <PortalPageHeader
@@ -293,7 +345,16 @@ export function StorageItemsApp({
         onSelect={(id) => setStatus((current) => (current === id ? "" : id))}
       />
 
-      <ZgtToolbar>
+      <ZgtToolbar
+        actions={
+          canWrite ? (
+            <button type="button" className={zgtBtnPrimaryClass} onClick={openCreate}>
+              <PlusIcon size={16} weight="bold" aria-hidden />
+              Добавить
+            </button>
+          ) : null
+        }
+      >
         <ZgtSearchField
           value={q}
           onChange={setQ}
@@ -320,12 +381,6 @@ export function StorageItemsApp({
             Сбросить фильтры
           </button>
         ) : null}
-        {canWrite ? (
-          <button type="button" className={zgtBtnPrimaryClass} onClick={openCreate}>
-            <PlusIcon size={16} weight="bold" aria-hidden />
-            Добавить
-          </button>
-        ) : null}
       </ZgtToolbar>
 
       {canWrite && selected.size > 0 ? (
@@ -345,11 +400,11 @@ export function StorageItemsApp({
           </div>
           <button
             type="button"
-            className={zgtBtnSecondaryClass}
-            disabled={pending}
+            className={zgtBtnPrimaryClass}
+            disabled={pending || !issuePersonId}
             onClick={() => void runBatch("issue")}
           >
-            Выдать
+            {pendingAction === "issue" ? "Выдача…" : "Выдать"}
           </button>
           <button
             type="button"
@@ -357,15 +412,18 @@ export function StorageItemsApp({
             disabled={pending}
             onClick={() => void runBatch("return")}
           >
-            Вернуть
+            {pendingAction === "return" ? "Возврат…" : "Вернуть"}
           </button>
         </ZgtBatchBar>
       ) : null}
 
       {error ? <ZgtAlert message={error} onDismiss={() => setError(null)} /> : null}
+      {notice ? (
+        <ZgtAlert message={notice} tone="success" onDismiss={() => setNotice(null)} />
+      ) : null}
 
       <ZgtDataPanel
-        title="Список"
+        title="Носители"
         total={data.total}
         loading={loading}
         footer={
@@ -403,92 +461,141 @@ export function StorageItemsApp({
             }
           />
         ) : (
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-white/[0.03] text-xs font-semibold text-text-muted">
-              <tr>
+          <ZgtListLayout
+            table={
+              <table className="min-w-full text-left text-sm">
+                <thead className="sticky top-0 bg-bg-panel text-xs font-semibold text-text-muted">
+                  <tr>
+                    {canWrite ? (
+                      <th className="w-12 px-2 py-2 font-semibold">
+                        <ZgtCheckbox
+                          checked={allVisibleSelected}
+                          indeterminate={someVisibleSelected}
+                          onChange={toggleAllVisible}
+                          label="Выбрать все на странице"
+                        />
+                      </th>
+                    ) : null}
+                    <th className="px-3 py-2 font-semibold">Тип</th>
+                    <th className="px-3 py-2 font-semibold">Инв. / серийный</th>
+                    <th className="px-3 py-2 font-semibold">Статус</th>
+                    <th className="px-3 py-2 font-semibold">Кому</th>
+                    <th className="px-3 py-2 font-semibold">
+                      <span className="sr-only">Действия</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.items.map((item) => (
+                    <tr
+                      key={item.id}
+                      className="border-t border-line/80 transition-colors duration-150 hover:bg-white/[0.025]"
+                    >
+                      {canWrite ? (
+                        <td className="px-2 py-1.5">
+                          <ZgtCheckbox
+                            checked={selected.has(item.id)}
+                            onChange={() => toggle(item.id)}
+                            label={`Выбрать ${item.inventoryNumber || item.type}`}
+                          />
+                        </td>
+                      ) : null}
+                      <td className="px-3 py-2.5">
+                        <button
+                          type="button"
+                          className="cursor-pointer text-left font-semibold text-text-primary transition-colors hover:text-cyan"
+                          onClick={() => openEdit(item)}
+                        >
+                          {storageItemTypeLabel(item.type)}
+                        </button>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="font-mono text-xs tabular-nums">
+                          {item.inventoryNumber || "—"}
+                        </div>
+                        <div className="text-xs text-text-muted">
+                          {item.serialNumber || "без S/N"}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <StatusBadge
+                          label={storageItemStatusLabel(item.status)}
+                          tone={statusTone(item.status)}
+                        />
+                      </td>
+                      <td className="px-3 py-2.5 text-text-secondary">
+                        {item.personName ? (
+                          <>
+                            <div>{item.personName}</div>
+                            <div className="text-xs text-text-muted">{item.personRank}</div>
+                          </>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {canWrite ? (
+                          <div className="flex justify-end gap-1">{rowActions(item)}</div>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            }
+            cards={
+              <div>
                 {canWrite ? (
-                  <th className="w-12 px-2 py-2 font-semibold">
+                  <div className="flex items-center gap-2 border-b border-line px-3 py-2">
                     <ZgtCheckbox
                       checked={allVisibleSelected}
                       indeterminate={someVisibleSelected}
                       onChange={toggleAllVisible}
                       label="Выбрать все на странице"
                     />
-                  </th>
+                    <span className="text-xs font-semibold text-text-muted">Выбрать все на странице</span>
+                  </div>
                 ) : null}
-                <th className="px-3 py-2 font-semibold">Тип</th>
-                <th className="px-3 py-2 font-semibold">Инв. / серийный</th>
-                <th className="px-3 py-2 font-semibold">Статус</th>
-                <th className="px-3 py-2 font-semibold">Кому</th>
-                <th className="px-3 py-2 font-semibold">
-                  <span className="sr-only">Действия</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((item) => (
-                <tr
-                  key={item.id}
-                  className="border-t border-line/80 transition-colors duration-150 hover:bg-white/[0.025]"
-                >
-                  {canWrite ? (
-                    <td className="px-2 py-1.5">
-                      <ZgtCheckbox
-                        checked={selected.has(item.id)}
-                        onChange={() => toggle(item.id)}
-                        label={`Выбрать ${item.inventoryNumber || item.type}`}
-                      />
-                    </td>
-                  ) : null}
-                  <td className="px-3 py-2.5 font-semibold">
-                    {storageItemTypeLabel(item.type)}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <div className="font-mono text-xs tabular-nums">
-                      {item.inventoryNumber || "—"}
-                    </div>
-                    <div className="text-xs text-text-muted">
-                      {item.serialNumber || "без S/N"}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <StatusBadge
-                      label={storageItemStatusLabel(item.status)}
-                      tone={statusTone(item.status)}
-                    />
-                  </td>
-                  <td className="px-3 py-2.5 text-text-secondary">
-                    {item.personName ? (
-                      <>
-                        <div>{item.personName}</div>
-                        <div className="text-xs text-text-muted">{item.personRank}</div>
-                      </>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    {canWrite ? (
-                      <div className="flex justify-end gap-1">
-                        <ZgtIconButton label="Изменить" onClick={() => openEdit(item)}>
-                          <PencilSimpleIcon size={16} aria-hidden />
-                        </ZgtIconButton>
-                        <ZgtIconButton
-                          label="Удалить"
-                          className="text-red hover:text-red"
-                          onClick={() =>
-                            void removeItem(item.id, item.inventoryNumber || item.type)
-                          }
-                        >
-                          <TrashIcon size={16} aria-hidden />
-                        </ZgtIconButton>
-                      </div>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                {data.items.map((item) => (
+                  <ZgtMobileCard
+                    key={item.id}
+                    leading={
+                      canWrite ? (
+                        <ZgtCheckbox
+                          checked={selected.has(item.id)}
+                          onChange={() => toggle(item.id)}
+                          label={`Выбрать ${item.inventoryNumber || item.type}`}
+                        />
+                      ) : null
+                    }
+                    title={storageItemTypeLabel(item.type)}
+                    subtitle={item.inventoryNumber || item.serialNumber || undefined}
+                    onOpen={() => openEdit(item)}
+                    fields={[
+                      {
+                        label: "Статус",
+                        value: (
+                          <StatusBadge
+                            label={storageItemStatusLabel(item.status)}
+                            tone={statusTone(item.status)}
+                          />
+                        ),
+                      },
+                      {
+                        label: "Кому",
+                        value: item.personName
+                          ? `${item.personRank ?? ""} ${item.personName}`.trim()
+                          : "—",
+                      },
+                      { label: "Инв. №", value: item.inventoryNumber || "—" },
+                      { label: "Серийный", value: item.serialNumber || "—" },
+                    ]}
+                    actions={rowActions(item)}
+                  />
+                ))}
+              </div>
+            }
+          />
         )}
       </ZgtDataPanel>
 
@@ -498,93 +605,98 @@ export function StorageItemsApp({
         description="При выдаче выберите человека из реестра Расхода."
         onClose={() => setEditorOpen(false)}
       >
-        <div className="grid gap-3 sm:grid-cols-2">
-          <ZgtSelectField
-            label="Тип"
-            value={form.type}
-            onChange={(value) =>
-              setForm((f) => ({ ...f, type: value as StorageItemType }))
-            }
-          >
-            {STORAGE_ITEM_TYPES.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </ZgtSelectField>
-          <ZgtSelectField
-            label="Статус"
-            value={form.status}
-            onChange={(value) =>
-              setForm((f) => ({ ...f, status: value as StorageItemStatus }))
-            }
-          >
-            {STORAGE_ITEM_STATUSES.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </ZgtSelectField>
-          <ZgtField label="Инв. №">
-            <ZgtInput
-              value={form.inventoryNumber ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, inventoryNumber: e.target.value }))}
-            />
-          </ZgtField>
-          <ZgtField label="Серийный">
-            <ZgtInput
-              value={form.serialNumber ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, serialNumber: e.target.value }))}
-            />
-          </ZgtField>
-          <ZgtField label="Ёмкость, ГБ">
-            <ZgtInput
-              type="number"
-              min={1}
-              value={form.capacityGb ?? ""}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  capacityGb: e.target.value ? Number(e.target.value) : null,
-                }))
+        {formError ? <ZgtAlert message={formError} onDismiss={() => setFormError(null)} /> : null}
+        <div className="grid gap-3">
+          <ZgtFormSection title="Основное">
+            <ZgtSelectField
+              label="Тип"
+              value={form.type}
+              onChange={(value) =>
+                setForm((f) => ({ ...f, type: value as StorageItemType }))
               }
-            />
-          </ZgtField>
-          <ZgtField label="Уровень доступа">
-            <ZgtInput
-              type="number"
-              min={0}
-              max={99}
-              value={form.accessLevel ?? ""}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  accessLevel: e.target.value ? Number(e.target.value) : null,
-                }))
+            >
+              {STORAGE_ITEM_TYPES.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </ZgtSelectField>
+            <ZgtSelectField
+              label="Статус"
+              value={form.status}
+              onChange={(value) =>
+                setForm((f) => ({ ...f, status: value as StorageItemStatus }))
               }
-            />
-          </ZgtField>
-          <div className="sm:col-span-2">
-            <ZgtPersonSearch
-              label="Кому"
-              query={personQuery}
-              onQueryChange={setPersonQuery}
-              selectedId={form.personId}
-              onSelect={(person) => {
-                setForm((f) => ({ ...f, personId: person.id, status: "in_use" }));
-                setPersonQuery(`${person.rank} ${person.name}`);
-                setIssuePersonId(person.id);
-                setIssuePersonQuery(`${person.rank} ${person.name}`);
-              }}
-              onClear={() => setForm((f) => ({ ...f, personId: null }))}
-            />
-          </div>
-          <ZgtField label="Заметки" className="sm:col-span-2">
-            <ZgtTextarea
-              value={form.notes ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-            />
-          </ZgtField>
+            >
+              {STORAGE_ITEM_STATUSES.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </ZgtSelectField>
+          </ZgtFormSection>
+          <ZgtFormSection title="Идентификация">
+            <ZgtField label="Инв. №">
+              <ZgtInput
+                value={form.inventoryNumber ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, inventoryNumber: e.target.value }))}
+              />
+            </ZgtField>
+            <ZgtField label="Серийный">
+              <ZgtInput
+                value={form.serialNumber ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, serialNumber: e.target.value }))}
+              />
+            </ZgtField>
+            <ZgtField label="Ёмкость, ГБ">
+              <ZgtInput
+                type="number"
+                min={1}
+                value={form.capacityGb ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    capacityGb: e.target.value ? Number(e.target.value) : null,
+                  }))
+                }
+              />
+            </ZgtField>
+            <ZgtField label="Уровень доступа">
+              <ZgtInput
+                type="number"
+                min={0}
+                max={99}
+                value={form.accessLevel ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    accessLevel: e.target.value ? Number(e.target.value) : null,
+                  }))
+                }
+              />
+            </ZgtField>
+          </ZgtFormSection>
+          <ZgtFormSection title="Выдача">
+            <div className="sm:col-span-2">
+              <ZgtPersonSearch
+                label="Кому"
+                query={personQuery}
+                onQueryChange={setPersonQuery}
+                selectedId={form.personId}
+                onSelect={(person) => {
+                  setForm((f) => ({ ...f, personId: person.id, status: "in_use" }));
+                  setPersonQuery(`${person.rank} ${person.name}`);
+                }}
+                onClear={() => setForm((f) => ({ ...f, personId: null }))}
+              />
+            </div>
+            <ZgtField label="Заметки" className="sm:col-span-2">
+              <ZgtTextarea
+                value={form.notes ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+              />
+            </ZgtField>
+          </ZgtFormSection>
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <button
@@ -604,6 +716,19 @@ export function StorageItemsApp({
           </button>
         </div>
       </ZgtDialog>
+
+      <ZgtConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Удалить запись?"
+        text={
+          deleteTarget
+            ? `«${deleteTarget.name}» будет удалена без возможности отмены.`
+            : ""
+        }
+        pending={pending}
+        onConfirm={() => void removeItem()}
+        onClose={() => setDeleteTarget(null)}
+      />
     </>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { GearSixIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { SelectField } from "@/components/select-field";
 import type { Platoon } from "../../roster/types";
@@ -10,6 +10,10 @@ import { CollapsibleSection } from "./collapsible-section";
 import { GROUP_NAME_MAX_LENGTH, GROUP_NOTES_MAX_LENGTH } from "./constants";
 import { priorityModeOptions } from "./shared-meta";
 import { StyledCheckbox } from "./styled-checkbox";
+
+export function settingsSavedRevision(item: DutyGroupSnapshot): string {
+  return `${item.group.id}:${item.group.updatedAt}`;
+}
 
 export function SettingsPanel({
   item,
@@ -40,6 +44,22 @@ export function SettingsPanel({
   const [overlapPolicy, setOverlapPolicy] = useState<GroupOverlapPolicy>(
     item.rule.overlapPolicy,
   );
+
+  const savedRevision = settingsSavedRevision(item);
+
+  useEffect(() => {
+    setName(item.group.name);
+    setNotes(item.group.notes);
+    setNameTouched(false);
+    setPeoplePerDay(item.rule.peoplePerDay);
+    setAssignmentQuotas(item.rule.assignmentQuotas);
+    setEnabledPlatoons(item.rule.enabledPlatoons);
+    setAutoRotate(item.rule.autoRotate);
+    setActiveDays(item.rule.activeDays);
+    setPriorityMode(item.rule.priorityMode);
+    setOverlapPolicy(item.rule.overlapPolicy);
+    setDeleteRequested(false);
+  }, [savedRevision]);
 
   const togglePlatoon = (id: string) =>
     setEnabledPlatoons((current) =>

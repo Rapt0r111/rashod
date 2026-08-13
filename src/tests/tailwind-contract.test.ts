@@ -12,6 +12,7 @@ describe("Tailwind CSS migration contract", () => {
     expect(globals).toContain('@import "tailwindcss";');
     expect(globals).toContain("@theme inline");
     expect(globals).toContain("@layer base");
+    expect(globals).toContain("[data-portal-shell] [data-portal-shell]");
     expect(globals).not.toContain("@layer components");
     expect(globals).not.toContain("Migrated from");
     expect(globals).not.toContain("@tailwind base");

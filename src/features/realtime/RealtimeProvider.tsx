@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 
-export type RealtimeDomain = "roster" | "groups" | "tasks" | "unknown";
+export type RealtimeDomain = "roster" | "groups" | "tasks" | "zgt" | "unknown";
 
 export type RealtimeEvent = {
   reason: string;
@@ -53,6 +53,9 @@ const GROUPS_REASONS = new Set(["groups", "groups-refresh"]);
 /** Reasons published for tasks (plus `task*` prefix fallback). */
 const TASKS_REASONS = new Set(["tasks"]);
 
+/** Reasons published for ЗГТ (plus `zgt*` prefix fallback). */
+const ZGT_REASONS = new Set(["zgt"]);
+
 /**
  * Map NOTIFY reason → domain. Empty/malformed → `unknown` so every subscriber
  * still refreshes (legacy clients often sent empty payloads).
@@ -62,6 +65,7 @@ export function classifyRealtimeReason(reason: string): RealtimeDomain {
   if (ROSTER_REASONS.has(reason)) return "roster";
   if (GROUPS_REASONS.has(reason) || reason.startsWith("group")) return "groups";
   if (TASKS_REASONS.has(reason) || reason.startsWith("task")) return "tasks";
+  if (ZGT_REASONS.has(reason) || reason.startsWith("zgt")) return "zgt";
   return "unknown";
 }
 

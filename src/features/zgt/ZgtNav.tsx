@@ -53,7 +53,7 @@ export function ZgtNav({ activePath }: { activePath: string }) {
             key={link.href}
             href={link.href}
             className={cx(
-              "inline-flex min-h-[42px] shrink-0 items-center gap-2 rounded-[13px] border px-3 text-sm font-semibold no-underline transition-[background-color,border-color,color] duration-150",
+              "inline-flex min-h-[42px] shrink-0 items-center gap-2 rounded-[13px] border px-3 text-sm font-semibold no-underline transition-[background-color,border-color,color,box-shadow] duration-150 focus-visible:border-cyan focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_color-mix(in_oklch,var(--cyan)_22%,transparent)]",
               active
                 ? "border-[color-mix(in_oklch,var(--cyan)_34%,transparent)] bg-[color-mix(in_oklch,var(--cyan)_14%,transparent)] text-cyan"
                 : "border-transparent text-text-secondary hover:border-line hover:bg-white/[0.04] hover:text-text-primary",

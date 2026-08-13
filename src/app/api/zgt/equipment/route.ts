@@ -23,6 +23,7 @@ import {
   type EquipmentStatus,
 } from "@/features/zgt/types";
 import { liveJson } from "@/server/cache/http";
+import { publishRosterChanged } from "@/server/events";
 
 
 export async function GET(request: Request) {
@@ -66,6 +67,7 @@ export async function POST(request: Request) {
         () => createEquipment(body.data, auth.user.id),
         { displayName: body.data.displayName },
       );
+      publishRosterChanged("zgt");
       return NextResponse.json({ item });
     }
 
@@ -76,6 +78,7 @@ export async function POST(request: Request) {
         () => updateEquipment(body.id, body.data),
         { equipmentId: body.id },
       );
+      publishRosterChanged("zgt");
       return NextResponse.json({ item });
     }
 
@@ -86,6 +89,7 @@ export async function POST(request: Request) {
         () => softDeleteEquipment(body.id),
         { equipmentId: body.id },
       );
+      publishRosterChanged("zgt");
       return NextResponse.json({ ok: true });
     }
 
@@ -101,6 +105,7 @@ export async function POST(request: Request) {
           }),
         { count: body.data.ids.length },
       );
+      publishRosterChanged("zgt");
       return NextResponse.json(result);
     }
 
@@ -115,6 +120,7 @@ export async function POST(request: Request) {
           }),
         { count: body.data.ids.length },
       );
+      publishRosterChanged("zgt");
       return NextResponse.json(result);
     }
 
@@ -128,6 +134,7 @@ export async function POST(request: Request) {
         }),
       { count: body.data.ids.length },
     );
+    publishRosterChanged("zgt");
     return NextResponse.json(result);
   } catch (error) {
     return apiError(error);

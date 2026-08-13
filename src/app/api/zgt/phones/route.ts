@@ -16,6 +16,7 @@ import {
   type PhoneStatus,
 } from "@/features/zgt/phones-types";
 import { liveJson } from "@/server/cache/http";
+import { publishRosterChanged } from "@/server/events";
 
 
 export async function GET(request: Request) {
@@ -61,6 +62,7 @@ export async function POST(request: Request) {
         () => createPhone(body.data, auth.user.id),
         { personId: body.data.personId },
       );
+      publishRosterChanged("zgt");
       return NextResponse.json({ item });
     }
     if (body.action === "update") {
@@ -70,6 +72,7 @@ export async function POST(request: Request) {
         () => updatePhone(body.id, body.data),
         { phoneId: body.id },
       );
+      publishRosterChanged("zgt");
       return NextResponse.json({ item });
     }
     if (body.action === "delete") {
@@ -79,6 +82,7 @@ export async function POST(request: Request) {
         () => softDeletePhone(body.id),
         { phoneId: body.id },
       );
+      publishRosterChanged("zgt");
       return NextResponse.json({ ok: true });
     }
     if (body.action === "batch-check-in") {
@@ -88,6 +92,7 @@ export async function POST(request: Request) {
         () => batchCheckInPhones(body.data),
         { count: body.data.ids.length },
       );
+      publishRosterChanged("zgt");
       return NextResponse.json(result);
     }
     const result = await runAuditedMutation(
@@ -96,6 +101,7 @@ export async function POST(request: Request) {
       () => batchCheckOutPhones(body.data),
       { count: body.data.ids.length },
     );
+    publishRosterChanged("zgt");
     return NextResponse.json(result);
   } catch (error) {
     return apiError(error);

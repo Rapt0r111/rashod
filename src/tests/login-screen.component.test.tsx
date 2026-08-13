@@ -14,5 +14,7 @@ describe("LoginScreen", () => {
     const { container } = render(<LoginScreen setupRequired />);
     expect(container.querySelector("form")).not.toBeInTheDocument();
     expect(container.querySelector("code")).toBeInTheDocument();
+    expect(container.querySelector("code")?.textContent).toContain("[отображаемое имя]");
+    expect(container.querySelector("code")?.textContent).not.toContain("<пароль>");
   });
 });

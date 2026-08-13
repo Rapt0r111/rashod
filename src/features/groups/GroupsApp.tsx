@@ -662,7 +662,6 @@ export function GroupsApp({
 
         {activeSnapshot && canWrite && (
           <SettingsPanel
-            key={`${activeSnapshot.group.id}:${activeSnapshot.group.updatedAt}:${activeSnapshot.rule.peoplePerDay}:${activeSnapshot.rule.assignmentQuotas.map((quota) => quota.platoonId + "-" + quota.count).join(",")}:${activeSnapshot.rule.autoRotate}:${activeSnapshot.rule.activeDays.join("-")}:${activeSnapshot.rule.enabledPlatoons.join("-")}:${activeSnapshot.rule.priorityMode}:${activeSnapshot.rule.overlapPolicy}`}
             item={activeSnapshot}
             platoons={platoons}
             isBusy={isBusy}
@@ -714,8 +713,7 @@ export function GroupsApp({
       {isAssignOpen && activeSnapshot && canWrite && (
         <PersonPickerPanel
           title="Назначить вручную"
-          people={selectedAvailablePeople}
-          candidatePeople={activeSnapshot.candidatePeople}
+          groupId={activeSnapshot.group.id}
           availablePeopleByDate={activeSnapshot.availablePeopleByDate}
           initialDate={effectiveSelectedDate}
           onClose={() => {

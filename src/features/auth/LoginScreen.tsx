@@ -62,7 +62,7 @@ export function LoginScreen({ setupRequired }: { setupRequired: boolean }) {
           >
             Первый администратор ещё не создан. На сервере выполните{" "}
             <code className="rounded-md border border-line bg-bg-raised px-1.5 py-0.5 font-mono text-[13px]">
-              bun run auth:create-admin &lt;логин&gt; &lt;пароль&gt;
+              bun run auth:create-admin &lt;логин&gt; [отображаемое имя]
             </code>{" "}
             с паролем длиной не менее 12 символов.
           </p>

@@ -8,9 +8,10 @@ import type { GroupsSnapshot } from "./groups/types";
 import type { TasksSnapshot } from "./tasks/types";
 import { Loader } from "@/components/loader";
 import { RealtimeProvider } from "@/features/realtime/RealtimeProvider";
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { fetchScheduleSnapshot } from "./schedule/api";
 import type { ScheduleSnapshot } from "./schedule/types";
+import { useRealtimeDomain } from "@/features/realtime/RealtimeProvider";
 
 // Prefer data-fetch loading over a second dynamic() spinner flash.
 const GroupsApp = dynamic(
@@ -49,24 +50,50 @@ function WorkspaceBody(props: WorkspaceProps) {
   return <TasksApp initialSnapshot={props.initialSnapshot} canWrite={props.canWrite} />;
 }
 
+export function shouldFetchScheduleOnEnter(): true {
+  return true;
+}
+
+export function scheduleCacheAfterGroupsEvent(view: "groups" | "schedule"): "reload" | "drop" {
+  return view === "schedule" ? "reload" : "drop";
+}
+
 function GroupsWorkspace({ initialSnapshot, canWrite }: { initialSnapshot: GroupsSnapshot; canWrite: boolean }) {
   const [view, setView] = useState<"groups" | "schedule">("groups");
   const [scheduleSnapshot, setScheduleSnapshot] = useState<ScheduleSnapshot | null>(null);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const loadingRef = useRef(false);
 
-  async function openSchedule() {
-    setView("schedule");
-    if (scheduleSnapshot || loadingSchedule) return;
+  const loadSchedule = useCallback(async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setLoadingSchedule(true);
     setScheduleError(null);
     try {
       setScheduleSnapshot(await fetchScheduleSnapshot());
     } catch {
+      setScheduleSnapshot(null);
       setScheduleError("Не удалось загрузить график.");
     } finally {
+      loadingRef.current = false;
       setLoadingSchedule(false);
     }
+  }, []);
+
+  useRealtimeDomain(["groups", "unknown"], () => {
+    if (scheduleCacheAfterGroupsEvent(viewRef.current) === "reload") {
+      void loadSchedule();
+      return;
+    }
+    setScheduleSnapshot(null);
+  });
+
+  function openSchedule() {
+    setView("schedule");
+    if (shouldFetchScheduleOnEnter()) void loadSchedule();
   }
 
   return (

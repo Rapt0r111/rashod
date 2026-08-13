@@ -64,12 +64,13 @@ export async function changePostgresPersonLocation(personId: string, to: string,
     const current = rows[0];
     if (!current) throw new Error("PERSON_NOT_FOUND");
     if (!(await transaction`SELECT 1 FROM locations WHERE key = ${location}`).length) throw new Error("LOCATION_NOT_FOUND");
-    if (current.location === location) return { person: person(current), log: null as LogEntry | null };
+    const movement = locationChangeLog(current, location);
+    if (!movement) return { person: person(current), log: null as LogEntry | null };
     const updatedRows = await transaction<DbPerson[]>`UPDATE people SET location = ${location}, updated_at = now() WHERE id = ${personId} RETURNING id, platoon_id AS "platoonId", rank, name, conscription_number AS "conscriptionNumber", location, sort_order AS "sortOrder", created_at, updated_at`;
     let entry: LogEntry | null = null;
     if (writeLog) {
       const id = randomUUID();
-      const inserted = await transaction<DbLog[]>`INSERT INTO movement_logs (id, person_id, name, from_value, to_value) VALUES (${id}, ${personId}, ${current.name}, ${current.location}, ${location}) RETURNING id, person_id AS "personId", name, from_value AS "from", to_value AS "to", occurred_at`;
+      const inserted = await transaction<DbLog[]>`INSERT INTO movement_logs (id, person_id, name, from_value, to_value) VALUES (${id}, ${personId}, ${movement.name}, ${movement.from}, ${movement.to}) RETURNING id, person_id AS "personId", name, from_value AS "from", to_value AS "to", occurred_at`;
       entry = log(inserted[0]);
       await transaction`DELETE FROM movement_logs WHERE id IN (SELECT id FROM movement_logs ORDER BY occurred_at DESC OFFSET ${MAX_LOG_ENTRIES})`;
     }
@@ -149,6 +150,14 @@ export async function undoPostgresLocations(changes: Array<{ personId: string; l
   });
 }
 
+export function locationChangeLog(
+  existing: { name: string; location: string } | undefined,
+  nextLocation: string,
+): { name: string; from: string; to: string } | null {
+  if (!existing || existing.location === nextLocation) return null;
+  return { name: existing.name, from: existing.location, to: nextLocation };
+}
+
 export async function upsertPostgresPerson(input: Partial<Person> & Pick<Person, "name" | "rank" | "platoonId">) {
   const sql = pg();
   const id = input.id ?? randomUUID();
@@ -157,15 +166,51 @@ export async function upsertPostgresPerson(input: Partial<Person> & Pick<Person,
   const location = input.location?.trim() || "rota";
   const conscriptionNumber = input.conscriptionNumber?.trim() || null;
   if (!(await sql`SELECT 1 FROM locations WHERE key = ${location}`).length) throw new Error("LOCATION_NOT_FOUND");
-  const result = await sql<DbPerson[]>`INSERT INTO people (id, platoon_id, rank, name, conscription_number, location, sort_order) VALUES (${id}, ${input.platoonId}, ${input.rank.trim()}, ${input.name.trim()}, ${conscriptionNumber}, ${location}, ${input.sortOrder ?? Date.now()}) ON CONFLICT (id) DO UPDATE SET platoon_id = EXCLUDED.platoon_id, rank = EXCLUDED.rank, name = EXCLUDED.name, conscription_number = EXCLUDED.conscription_number, location = EXCLUDED.location, sort_order = EXCLUDED.sort_order, updated_at = now() RETURNING id, platoon_id AS "platoonId", rank, name, conscription_number AS "conscriptionNumber", location, sort_order AS "sortOrder", created_at, updated_at`;
-  return person(result[0]);
+  return inPostgresTransaction(async (transaction) => {
+    const existing = input.id
+      ? (
+          await transaction<DbPerson[]>`
+            SELECT id, platoon_id AS "platoonId", rank, name, conscription_number AS "conscriptionNumber", location, sort_order AS "sortOrder", created_at, updated_at
+            FROM people WHERE id = ${id} FOR UPDATE
+          `
+        )[0]
+      : undefined;
+    const result = await transaction<DbPerson[]>`
+      INSERT INTO people (id, platoon_id, rank, name, conscription_number, location, sort_order)
+      VALUES (${id}, ${input.platoonId}, ${input.rank.trim()}, ${input.name.trim()}, ${conscriptionNumber}, ${location}, ${input.sortOrder ?? Date.now()})
+      ON CONFLICT (id) DO UPDATE SET
+        platoon_id = EXCLUDED.platoon_id, rank = EXCLUDED.rank, name = EXCLUDED.name,
+        conscription_number = EXCLUDED.conscription_number, location = EXCLUDED.location,
+        sort_order = EXCLUDED.sort_order, updated_at = now()
+      RETURNING id, platoon_id AS "platoonId", rank, name, conscription_number AS "conscriptionNumber", location, sort_order AS "sortOrder", created_at, updated_at
+    `;
+    const movement = locationChangeLog(existing, location);
+    if (movement) {
+      await transaction`
+        INSERT INTO movement_logs (id, person_id, name, from_value, to_value)
+        VALUES (${randomUUID()}, ${id}, ${movement.name}, ${movement.from}, ${movement.to})
+      `;
+      await transaction`DELETE FROM movement_logs WHERE id IN (SELECT id FROM movement_logs ORDER BY occurred_at DESC OFFSET ${MAX_LOG_ENTRIES})`;
+    }
+    return person(result[0]);
+  });
 }
 
 export async function deletePostgresPerson(id: string) {
   await inPostgresTransaction(async (transaction) => {
     await transaction`DELETE FROM group_assignments WHERE person_id = ${id}`;
     await transaction`DELETE FROM group_exclusions WHERE person_id = ${id}`;
-    await transaction`DELETE FROM people WHERE id = ${id}`;
+    // Same unlink as equipment/storage FK SET NULL; also park the phone in storage.
+    await transaction`
+      UPDATE phones
+      SET person_id = NULL,
+          status = 'checked_in',
+          checked_in_at = COALESCE(checked_in_at, now()),
+          updated_at = now()
+      WHERE person_id = ${id} AND deleted_at IS NULL
+    `;
+    const deleted = await transaction`DELETE FROM people WHERE id = ${id} RETURNING id`;
+    if (!deleted.length) throw new Error("PERSON_NOT_FOUND");
   });
 }
 

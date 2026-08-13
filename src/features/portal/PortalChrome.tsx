@@ -11,6 +11,7 @@ import { SignOutIcon } from "@phosphor-icons/react";
 import type { PortalModuleId } from "./modules";
 import { PORTAL_MODULES } from "./modules";
 import { cx } from "@/features/roster/utils";
+import { RealtimeProvider } from "@/features/realtime/RealtimeProvider";
 
 const PortalShellContext = createContext(false);
 
@@ -55,7 +56,7 @@ export function PortalShell({
         displayName={displayName}
         availableModuleIds={availableModuleIds}
       >
-        {children}
+        <RealtimeProvider>{children}</RealtimeProvider>
       </PortalShellFrame>
     </PortalShellContext.Provider>
   );
@@ -82,9 +83,12 @@ function PortalShellFrame({
   }
 
   return (
-    <div className="relative z-1 isolate flex h-dvh min-h-0 flex-col overflow-hidden bg-bg-base bg-[radial-gradient(circle_at_18%_-8%,oklch(32%_0.12_302/0.28),transparent_36%),radial-gradient(circle_at_88%_12%,oklch(34%_0.11_193/0.16),transparent_30%)] text-text-primary">
+    <div
+      data-portal-shell=""
+      className="relative z-1 isolate flex h-dvh min-h-0 flex-col overflow-hidden bg-bg-base bg-[radial-gradient(circle_at_18%_-8%,oklch(32%_0.12_302/0.28),transparent_36%),radial-gradient(circle_at_88%_12%,oklch(34%_0.11_193/0.16),transparent_30%)] text-text-primary"
+    >
       <header className="shrink-0 border-b border-line bg-[color-mix(in_oklch,var(--bg-base)_94%,transparent)] backdrop-blur-md">
-        <div className="mx-auto flex min-h-16 max-w-5xl items-center gap-3 px-4 py-2.5 max-[560px]:px-3">
+        <div className="mx-auto flex min-h-16 w-full items-center gap-3 px-5 py-2.5 max-[560px]:px-3">
           <Link
             href="/portal"
             prefetch
@@ -159,10 +163,8 @@ function PortalShellFrame({
         </div>
       </header>
 
-      <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <div className="mx-auto w-full max-w-5xl px-4 py-8 max-[560px]:px-3 max-[560px]:py-6">
-          {children}
-        </div>
+      <main className="min-h-0 w-full min-w-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4">
+        {children}
       </main>
     </div>
   );
@@ -221,12 +223,13 @@ export function PortalChrome({
 export function PortalShellFallback() {
   return (
     <div
+      data-portal-shell=""
       className="relative z-1 isolate flex h-dvh min-h-0 flex-col overflow-hidden bg-bg-base text-text-primary"
       aria-busy="true"
       aria-label="Загрузка"
     >
       <header className="shrink-0 border-b border-line bg-[color-mix(in_oklch,var(--bg-base)_94%,transparent)]">
-        <div className="mx-auto flex min-h-16 max-w-5xl items-center gap-3 px-4 py-2.5">
+        <div className="mx-auto flex min-h-16 w-full items-center gap-3 px-5 py-2.5 max-[560px]:px-3">
           <div className="h-10 w-10 shrink-0 rounded-[13px] bg-white/8" />
           <div className="hidden h-4 w-28 rounded-md bg-white/6 min-[420px]:block" />
           <div className="ml-2 flex flex-1 gap-1.5">

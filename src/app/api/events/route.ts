@@ -4,7 +4,7 @@ import { sseHeaders } from "@/server/cache/http";
 
 
 export async function GET(request: Request) {
-  const auth = await requireAnyPermission(request, ["roster:read", "groups:read", "tasks:read"]);
+  const auth = await requireAnyPermission(request, ["roster:read", "groups:read", "tasks:read", "zgt:read"]);
   if (auth instanceof Response) return auth;
   if (request.signal.aborted) {
     return new Response(null, { status: 204 });

@@ -11,7 +11,7 @@ import {
 
 type DbPhone = {
   id: string;
-  personId: string;
+  personId: string | null;
   personName: string | null;
   personRank: string | null;
   brand: string | null;

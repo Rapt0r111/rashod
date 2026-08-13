@@ -119,6 +119,19 @@
     scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
   }
 
+  /* PPR/cacheComponents can nest a second portal chrome inside the first. */
+  [data-portal-shell] [data-portal-shell] {
+    display: contents;
+  }
+
+  [data-portal-shell] [data-portal-shell] > header {
+    display: none;
+  }
+
+  [data-portal-shell] [data-portal-shell] > main {
+    display: contents;
+  }
+
   *::-webkit-scrollbar {
     width: 10px;
     height: 10px;

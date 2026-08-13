@@ -28,3 +28,10 @@ export function removeScheduleAssignment(assignmentId: string) {
     body: JSON.stringify({ assignmentId }),
   });
 }
+
+export function generateSchedule(from: string, to: string) {
+  return fetchJson<ScheduleSnapshot>("/api/schedule/generate", {
+    method: "POST",
+    body: JSON.stringify({ from, to }),
+  });
+}

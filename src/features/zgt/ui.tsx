@@ -1,17 +1,25 @@
 "use client";
 
 import {
+  Children,
+  isValidElement,
   useEffect,
   useId,
+  useRef,
   useState,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
+  type KeyboardEvent,
   type ReactNode,
-  type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
+import Link from "next/link";
+import { SelectField } from "@/components/select-field";
 import {
+  CheckIcon,
   MagnifyingGlassIcon,
+  MinusIcon,
+  WarningCircleIcon,
   XIcon,
   type Icon,
 } from "@phosphor-icons/react";
@@ -21,11 +29,18 @@ import { cx } from "@/features/roster/utils";
 import { searchZgtPeople } from "./api";
 import type { PersonPickerItem } from "./types";
 
-export const zgtFieldClass =
-  "min-h-[42px] w-full rounded-[10px] border border-line bg-bg-raised px-3 py-2 text-sm text-text-primary outline-none transition-[border-color,box-shadow] duration-150 focus:border-cyan focus:shadow-[0_0_0_3px_color-mix(in_oklch,var(--cyan)_22%,transparent)] disabled:cursor-not-allowed disabled:opacity-50";
+const focusRingClass =
+  "focus-visible:border-cyan focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_color-mix(in_oklch,var(--cyan)_22%,transparent)]";
 
-export const zgtBtnClass =
-  "inline-flex min-h-[42px] cursor-pointer items-center justify-center gap-1.5 rounded-[10px] border px-3.5 text-sm font-semibold transition-[background-color,border-color,opacity,color] duration-150 disabled:cursor-not-allowed disabled:opacity-45";
+export const zgtFieldClass = cx(
+  "min-h-[42px] w-full rounded-[10px] border border-line bg-bg-raised px-3 py-2 text-sm text-text-primary outline-none transition-[border-color,box-shadow] duration-150 disabled:cursor-not-allowed disabled:opacity-50",
+  focusRingClass,
+);
+
+export const zgtBtnClass = cx(
+  "inline-flex min-h-[42px] cursor-pointer items-center justify-center gap-1.5 rounded-[10px] border px-3.5 text-sm font-semibold transition-[background-color,border-color,opacity,color,box-shadow] duration-150 disabled:cursor-not-allowed disabled:opacity-45",
+  focusRingClass,
+);
 
 export const zgtBtnPrimaryClass = cx(
   zgtBtnClass,
@@ -91,6 +106,7 @@ export type StatChip = {
   value: number;
   tone?: string;
   active?: boolean;
+  href?: string;
 };
 
 /** Dense KPI strip; chips can act as filters when onSelect is set. */
@@ -112,26 +128,21 @@ export function ZgtStatStrip({
       aria-label="Сводка"
     >
       {items.map((item) => {
-        const interactive = Boolean(onSelect);
-        const Comp = interactive ? "button" : "div";
-        return (
-          <Comp
-            key={item.id}
-            type={interactive ? "button" : undefined}
-            onClick={interactive ? () => onSelect?.(item.id) : undefined}
-            className={cx(
-              "rounded-2xl border bg-bg-panel/80 px-3 py-2.5 text-left transition-[border-color,background-color] duration-150",
-              item.active
-                ? "border-[color-mix(in_oklch,var(--cyan)_40%,transparent)] bg-[color-mix(in_oklch,var(--cyan)_10%,transparent)]"
-                : "border-line",
-              interactive &&
-                "cursor-pointer hover:border-line-strong hover:bg-bg-raised/70",
-            )}
-            aria-pressed={interactive ? item.active : undefined}
-          >
-            <div className="text-xs font-semibold text-text-muted">
-              {item.label}
-            </div>
+        const interactive = Boolean(onSelect) || Boolean(item.href);
+        const className = cx(
+          "rounded-2xl border bg-bg-panel/80 px-3 py-2.5 text-left no-underline transition-[border-color,background-color,box-shadow] duration-150",
+          item.active
+            ? "border-[color-mix(in_oklch,var(--cyan)_40%,transparent)] bg-[color-mix(in_oklch,var(--cyan)_10%,transparent)]"
+            : "border-line",
+          interactive &&
+            cx(
+              "cursor-pointer hover:border-line-strong hover:bg-bg-raised/70",
+              focusRingClass,
+            ),
+        );
+        const body = (
+          <>
+            <div className="text-xs font-semibold text-text-muted">{item.label}</div>
             <div
               className={cx(
                 "mt-1 font-mono text-2xl font-bold tabular-nums leading-none",
@@ -144,7 +155,42 @@ export function ZgtStatStrip({
             >
               {item.value}
             </div>
-          </Comp>
+          </>
+        );
+        if (onSelect) {
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onSelect(item.id)}
+              className={className}
+              aria-pressed={item.active}
+              aria-label={`${item.label}: ${item.value}`}
+            >
+              {body}
+            </button>
+          );
+        }
+        if (item.href) {
+          return (
+            <Link
+              key={item.id}
+              href={item.href}
+              className={className}
+              aria-label={`${item.label}: ${item.value}`}
+            >
+              {body}
+            </Link>
+          );
+        }
+        return (
+          <div
+            key={item.id}
+            className={className}
+            aria-label={`${item.label}: ${item.value}`}
+          >
+            {body}
+          </div>
         );
       })}
     </section>
@@ -153,9 +199,11 @@ export function ZgtStatStrip({
 
 export function ZgtToolbar({
   children,
+  actions,
   className,
 }: {
   children: ReactNode;
+  actions?: ReactNode;
   className?: string;
 }) {
   return (
@@ -166,6 +214,9 @@ export function ZgtToolbar({
       )}
     >
       {children}
+      {actions ? (
+        <div className="ms-auto flex flex-wrap items-end gap-2">{actions}</div>
+      ) : null}
     </section>
   );
 }
@@ -209,7 +260,10 @@ export function ZgtSearchField({
         {value ? (
           <button
             type="button"
-            className="absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-text-muted transition hover:bg-white/8 hover:text-text-primary"
+            className={cx(
+              "absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-text-muted transition hover:bg-white/8 hover:text-text-primary",
+              focusRingClass,
+            )}
             onClick={() => onChange("")}
             aria-label="Очистить поиск"
           >
@@ -227,28 +281,32 @@ export function ZgtSelectField({
   onChange,
   children,
   className,
-  ...rest
+  disabled,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   children: ReactNode;
   className?: string;
-} & Omit<SelectHTMLAttributes<HTMLSelectElement>, "value" | "onChange" | "className">) {
-  const id = useId();
+  disabled?: boolean;
+}) {
+  const options = Children.toArray(children).flatMap((child) => {
+    if (!isValidElement(child) || child.type !== "option") return [];
+    const props = child.props as { value?: string | number; children?: ReactNode };
+    return [{ value: String(props.value ?? ""), label: String(props.children ?? "") }];
+  });
   return (
-    <label className={cx("grid gap-1 text-xs font-semibold text-text-muted", className)} htmlFor={id}>
-      {label}
-      <select
-        id={id}
-        className={zgtFieldClass}
+    <div className={cx("grid min-w-0 gap-1", className)}>
+      <span className="text-xs font-semibold text-text-muted">{label}</span>
+      <SelectField
+        ariaLabel={label}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-        {...rest}
-      >
-        {children}
-      </select>
-    </label>
+        options={options}
+        onChange={onChange}
+        disabled={disabled}
+        variant="admin"
+      />
+    </div>
   );
 }
 
@@ -272,9 +330,12 @@ export function ZgtField({
       <span>
         {label}
         {required ? (
-          <span className="ml-1 text-red" aria-hidden>
-            *
-          </span>
+          <>
+            <span className="ml-1 text-red" aria-hidden>
+              *
+            </span>
+            <span className="sr-only"> (обязательно)</span>
+          </>
         ) : null}
       </span>
       {children}
@@ -287,6 +348,28 @@ export function ZgtField({
         </span>
       ) : null}
     </label>
+  );
+}
+
+export function ZgtFormSection({
+  title,
+  children,
+  className,
+}: {
+  title: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <fieldset
+      className={cx(
+        "col-span-full grid gap-3 rounded-[10px] border border-line bg-bg-raised/40 p-3 sm:grid-cols-2",
+        className,
+      )}
+    >
+      <legend className="px-1 text-sm font-bold text-text-primary">{title}</legend>
+      {children}
+    </fieldset>
   );
 }
 
@@ -305,22 +388,36 @@ export function ZgtTextarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) 
 
 export function ZgtAlert({
   message,
+  tone = "error",
   onDismiss,
 }: {
   message: string;
+  tone?: "error" | "success" | "warning";
   onDismiss?: () => void;
 }) {
+  const palette =
+    tone === "success"
+      ? "border-[color-mix(in_oklch,var(--green)_35%,transparent)] bg-[color-mix(in_oklch,var(--green)_12%,transparent)] text-green"
+      : tone === "warning"
+        ? "border-[color-mix(in_oklch,var(--amber)_35%,transparent)] bg-[color-mix(in_oklch,var(--amber)_12%,transparent)] text-amber"
+        : "border-[color-mix(in_oklch,var(--red)_35%,transparent)] bg-[color-mix(in_oklch,var(--red)_12%,transparent)] text-red";
   return (
     <div
-      className="mb-3 flex items-start gap-3 rounded-2xl border border-[color-mix(in_oklch,var(--red)_35%,transparent)] bg-[color-mix(in_oklch,var(--red)_12%,transparent)] px-3 py-2.5 text-sm text-red"
-      role="alert"
-      aria-live="assertive"
+      className={cx(
+        "mb-3 flex items-start gap-3 rounded-2xl border px-3 py-2.5 text-sm",
+        palette,
+      )}
+      role={tone === "error" ? "alert" : "status"}
+      aria-live={tone === "error" ? "assertive" : "polite"}
     >
       <p className="m-0 min-w-0 flex-1 leading-5">{message}</p>
       {onDismiss ? (
         <button
           type="button"
-          className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-[10px] border border-transparent text-red transition hover:bg-white/8"
+          className={cx(
+            "grid h-[42px] w-[42px] shrink-0 place-items-center rounded-[10px] border border-transparent transition hover:bg-white/8",
+            focusRingClass,
+          )}
           onClick={onDismiss}
           aria-label="Закрыть сообщение"
         >
@@ -409,7 +506,7 @@ export function ZgtDataPanel({
       </div>
       <div
         className={cx(
-          "overflow-x-auto transition-opacity duration-150",
+          "transition-opacity duration-150",
           loading && "opacity-60",
         )}
       >
@@ -421,6 +518,73 @@ export function ZgtDataPanel({
         </div>
       ) : null}
     </section>
+  );
+}
+
+export function ZgtListLayout({
+  table,
+  cards,
+}: {
+  table: ReactNode;
+  cards: ReactNode;
+}) {
+  return (
+    <>
+      <div className="hidden overflow-x-auto md:block">{table}</div>
+      <div className="md:hidden">{cards}</div>
+    </>
+  );
+}
+
+export function ZgtMobileCard({
+  title,
+  subtitle,
+  fields,
+  actions,
+  leading,
+  onOpen,
+}: {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  fields?: Array<{ label: string; value: ReactNode }>;
+  actions?: ReactNode;
+  leading?: ReactNode;
+  onOpen?: () => void;
+}) {
+  return (
+    <article className="border-t border-line/80 px-3 py-3 first:border-t-0">
+      <div className="flex items-start gap-2">
+        {leading}
+        <div className="min-w-0 flex-1">
+          {onOpen ? (
+            <button
+              type="button"
+              className={cx(
+                "cursor-pointer rounded-[6px] text-left font-semibold text-text-primary transition-colors hover:text-cyan",
+                focusRingClass,
+              )}
+              onClick={onOpen}
+            >
+              {title}
+            </button>
+          ) : (
+            <div className="font-semibold text-text-primary">{title}</div>
+          )}
+          {subtitle ? <div className="mt-0.5 text-xs text-text-muted">{subtitle}</div> : null}
+          {fields && fields.length > 0 ? (
+            <dl className="mt-2 grid grid-cols-2 gap-2">
+              {fields.map((field) => (
+                <div key={field.label} className="min-w-0">
+                  <dt className="text-[11px] font-semibold text-text-muted">{field.label}</dt>
+                  <dd className="m-0 mt-0.5 text-sm text-text-secondary">{field.value}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
+        </div>
+        {actions ? <div className="flex shrink-0 flex-col gap-1">{actions}</div> : null}
+      </div>
+    </article>
   );
 }
 
@@ -490,6 +654,15 @@ export function ZgtDialog({
   const titleId = useId();
   const descId = useId();
 
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [open]);
+
   if (!open) return null;
 
   return (
@@ -524,7 +697,10 @@ export function ZgtDialog({
           </div>
           <button
             type="button"
-            className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-[10px] border border-line text-text-secondary transition hover:border-line-strong hover:bg-white/[0.06] hover:text-text-primary"
+            className={cx(
+              "grid h-[42px] w-[42px] shrink-0 place-items-center rounded-[10px] border border-line text-text-secondary transition hover:border-line-strong hover:bg-white/[0.06] hover:text-text-primary",
+              focusRingClass,
+            )}
             onClick={onClose}
             aria-label="Закрыть"
           >
@@ -535,6 +711,80 @@ export function ZgtDialog({
       </div>
     </div>
   );
+}
+
+export function ZgtConfirmDialog({
+  open,
+  title,
+  text,
+  confirmLabel = "Удалить",
+  pending,
+  onConfirm,
+  onClose,
+}: {
+  open: boolean;
+  title: string;
+  text: string;
+  confirmLabel?: string;
+  pending?: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const panelRef = useDialogFocus(onClose, { open });
+  const titleId = useId();
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] grid place-items-center bg-bg-overlay p-4"
+      onMouseDown={onClose}
+      role="presentation"
+    >
+      <div
+        ref={panelRef as React.RefObject<HTMLDivElement>}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="w-full max-w-md rounded-2xl border border-line bg-bg-panel p-5 shadow-(--shadow)"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start gap-3">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] border border-[color-mix(in_oklch,var(--red)_35%,transparent)] bg-[color-mix(in_oklch,var(--red)_12%,transparent)] text-red">
+            <WarningCircleIcon size={20} weight="fill" aria-hidden />
+          </div>
+          <div className="min-w-0">
+            <h2 id={titleId} className="m-0 text-lg font-bold">
+              {title}
+            </h2>
+            <p className="m-0 mt-1 text-sm leading-5 text-text-secondary">{text}</p>
+          </div>
+        </div>
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            className={zgtBtnSecondaryClass}
+            onClick={onClose}
+            disabled={pending}
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            className={zgtBtnDangerClass}
+            onClick={onConfirm}
+            disabled={pending}
+          >
+            {pending ? "Удаление…" : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function personLabel(person: PersonPickerItem) {
+  return `${person.rank} ${person.name}`.trim();
 }
 
 export function ZgtPersonSearch({
@@ -560,23 +810,93 @@ export function ZgtPersonSearch({
 }) {
   const [options, setOptions] = useState<PersonPickerItem[]>([]);
   const [searching, setSearching] = useState(false);
+  const [picked, setPicked] = useState<PersonPickerItem | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [open, setOpen] = useState(false);
   const listId = useId();
+  const inputId = useId();
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   useEffect(() => {
     if (!query.trim()) {
       setOptions([]);
       setSearching(false);
+      setOpen(false);
+      return;
+    }
+    if (picked && query.trim() === personLabel(picked)) {
+      setOptions([]);
+      setSearching(false);
+      setOpen(false);
       return;
     }
     setSearching(true);
     const handle = window.setTimeout(() => {
       void searchZgtPeople(query)
-        .then(setOptions)
-        .catch(() => setOptions([]))
+        .then((result) => {
+          setOptions(result);
+          setActiveIndex(0);
+          setOpen(true);
+        })
+        .catch(() => {
+          setOptions([]);
+          setOpen(true);
+        })
         .finally(() => setSearching(false));
     }, 200);
     return () => window.clearTimeout(handle);
-  }, [query]);
+  }, [picked, query]);
+
+  useEffect(() => {
+    if (!selectedId) setPicked(null);
+  }, [selectedId]);
+
+  function clearSelection() {
+    onQueryChange("");
+    onClear?.();
+    setPicked(null);
+    setOptions([]);
+    setOpen(false);
+  }
+
+  function choose(person: PersonPickerItem) {
+    setPicked(person);
+    onSelect(person);
+    onQueryChange(personLabel(person));
+    setOptions([]);
+    setOpen(false);
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.nativeEvent.isComposing) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setOpen(false);
+      return;
+    }
+    if (!open || options.length === 0) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      const next = Math.min(activeIndex + 1, options.length - 1);
+      setActiveIndex(next);
+      optionRefs.current[next]?.focus();
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      const next = Math.max(activeIndex - 1, 0);
+      setActiveIndex(next);
+      optionRefs.current[next]?.focus();
+      return;
+    }
+    if (event.key === "Enter" && options[activeIndex]) {
+      event.preventDefault();
+      choose(options[activeIndex]);
+    }
+  }
+
+  const showEmpty = open && !searching && query.trim() && options.length === 0 && !picked;
+  const selectedName = picked ? personLabel(picked) : query.trim();
 
   return (
     <div className={cx("grid gap-1", className)}>
@@ -588,28 +908,43 @@ export function ZgtPersonSearch({
             aria-hidden
           />
           <input
+            id={inputId}
             className={cx(zgtFieldClass, "pl-9 pr-9")}
             value={query}
             onChange={(event) => {
-              onQueryChange(event.target.value);
-              if (!event.target.value.trim()) onClear?.();
+              const next = event.target.value;
+              onQueryChange(next);
+              if (!next.trim()) {
+                onClear?.();
+                setPicked(null);
+                setOptions([]);
+                setOpen(false);
+                return;
+              }
+              if (picked && next.trim() !== personLabel(picked)) {
+                onClear?.();
+                setPicked(null);
+              }
             }}
+            onKeyDown={handleKeyDown}
             placeholder={placeholder}
             autoComplete="off"
             role="combobox"
-            aria-expanded={options.length > 0}
+            aria-expanded={open && options.length > 0}
             aria-controls={listId}
             aria-autocomplete="list"
+            aria-activedescendant={
+              open && options[activeIndex] ? `${listId}-${options[activeIndex].id}` : undefined
+            }
           />
           {query ? (
             <button
               type="button"
-              className="absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-text-muted hover:bg-white/8 hover:text-text-primary"
-              onClick={() => {
-                onQueryChange("");
-                onClear?.();
-                setOptions([]);
-              }}
+              className={cx(
+                "absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-text-muted hover:bg-white/8 hover:text-text-primary",
+                focusRingClass,
+              )}
+              onClick={clearSelection}
               aria-label="Очистить человека"
             >
               <XIcon size={14} weight="bold" />
@@ -620,25 +955,35 @@ export function ZgtPersonSearch({
       {searching ? (
         <span className="text-xs text-text-muted">Ищем в реестре…</span>
       ) : null}
+      {showEmpty ? (
+        <p className="m-0 text-xs text-text-muted">Никого не нашли. Проверьте фамилию или звание.</p>
+      ) : null}
       {options.length > 0 ? (
         <ul
           id={listId}
           role="listbox"
           className="m-0 max-h-44 list-none overflow-auto rounded-[10px] border border-line bg-bg-base p-1"
         >
-          {options.map((person) => (
-            <li key={person.id} role="option" aria-selected={selectedId === person.id}>
+          {options.map((person, index) => (
+            <li
+              key={person.id}
+              role="option"
+              id={`${listId}-${person.id}`}
+              aria-selected={selectedId === person.id || activeIndex === index}
+            >
               <button
                 type="button"
-                className="flex w-full flex-col rounded-lg px-3 py-2 text-left text-sm transition hover:bg-white/[0.06]"
-                onClick={() => {
-                  onSelect(person);
-                  setOptions([]);
+                ref={(node) => {
+                  optionRefs.current[index] = node;
                 }}
+                className={cx(
+                  "flex w-full flex-col rounded-lg px-3 py-2 text-left text-sm transition hover:bg-white/[0.06]",
+                  focusRingClass,
+                  activeIndex === index && "bg-white/[0.06]",
+                )}
+                onClick={() => choose(person)}
               >
-                <span className="font-semibold text-text-primary">
-                  {person.rank} {person.name}
-                </span>
+                <span className="font-semibold text-text-primary">{personLabel(person)}</span>
                 <span className="text-xs text-text-muted">
                   {person.platoonLabel ?? "—"} · {person.locationLabel ?? person.location}
                 </span>
@@ -647,9 +992,13 @@ export function ZgtPersonSearch({
           ))}
         </ul>
       ) : null}
-      {selectedId && !options.length ? (
-        <span className="text-xs font-mono text-text-muted">
-          Выбран: {selectedId.slice(0, 8)}…
+      {selectedId && selectedName ? (
+        <span className="inline-flex max-w-full items-center gap-1.5 text-xs text-text-secondary">
+          <CheckIcon size={12} className="shrink-0 text-green" aria-hidden />
+          <span className="min-w-0 truncate">
+            Выбран: <span className="font-semibold text-text-primary">{selectedName}</span>
+            {picked?.locationLabel ? ` · ${picked.locationLabel}` : ""}
+          </span>
         </span>
       ) : null}
     </div>
@@ -670,23 +1019,76 @@ export function ZgtCheckbox({
   className?: string;
 }) {
   return (
-    <label
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={indeterminate ? "mixed" : checked}
+      aria-label={label}
       className={cx(
-        "inline-flex min-h-[42px] min-w-[42px] cursor-pointer items-center justify-center gap-2",
+        "inline-flex min-h-[42px] min-w-[42px] cursor-pointer items-center justify-center rounded-[10px] border border-transparent transition-[border-color,background-color] duration-150 hover:bg-white/[0.05]",
+        focusRingClass,
         className,
       )}
+      onClick={() => onChange(!checked)}
     >
-      <input
-        type="checkbox"
-        className="h-4 w-4 accent-[var(--cyan)]"
-        checked={checked}
-        ref={(node) => {
-          if (node) node.indeterminate = Boolean(indeterminate);
-        }}
-        onChange={(event) => onChange(event.target.checked)}
-        aria-label={label}
-      />
-    </label>
+      <span
+        className={cx(
+          "grid h-5 w-5 place-items-center rounded-[6px] border transition-[border-color,background-color] duration-150",
+          checked || indeterminate
+            ? "border-accent-line bg-accent-soft text-text-primary"
+            : "border-line-strong bg-white/[0.04] text-transparent",
+        )}
+        aria-hidden
+      >
+        {indeterminate ? (
+          <MinusIcon size={12} weight="bold" />
+        ) : checked ? (
+          <CheckIcon size={12} weight="bold" />
+        ) : null}
+      </span>
+    </button>
+  );
+}
+
+export function ZgtToggleChip({
+  checked,
+  onChange,
+  label,
+  className,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      className={cx(
+        "inline-flex min-h-[42px] max-w-full cursor-pointer items-center gap-2 rounded-[13px] border px-3 text-left text-sm font-semibold transition-[border-color,background-color,color] duration-150",
+        focusRingClass,
+        checked
+          ? "border-accent-line bg-accent-soft text-text-primary"
+          : "border-line bg-bg-raised text-text-secondary hover:border-line-strong hover:text-text-primary",
+        className,
+      )}
+      onClick={() => onChange(!checked)}
+    >
+      <span
+        className={cx(
+          "grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[5px] border",
+          checked
+            ? "border-accent-line bg-[color-mix(in_oklch,var(--accent)_22%,transparent)]"
+            : "border-line-strong bg-white/[0.04]",
+        )}
+        aria-hidden
+      >
+        {checked ? <CheckIcon size={12} weight="bold" /> : null}
+      </span>
+      {label}
+    </button>
   );
 }
 
@@ -700,6 +1102,7 @@ export function ZgtIconButton({
       type="button"
       className={cx(
         "inline-flex min-h-[42px] min-w-[42px] cursor-pointer items-center justify-center rounded-[10px] border border-line bg-bg-raised text-text-secondary transition hover:border-line-strong hover:bg-white/[0.06] hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-45",
+        focusRingClass,
         className,
       )}
       aria-label={label}
