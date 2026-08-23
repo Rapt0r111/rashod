@@ -129,6 +129,25 @@ export function locationsAndCustom(people: Person[], locations: LocationOption[]
   );
 }
 
+/** Occupied places plus every catalog location marked isQuick, even when empty. */
+export function locationsAndQuick(people: Person[], locations: LocationOption[]) {
+  const occupied = locationsAndCustom(people, locations);
+  const occupiedMap = new Map(occupied.map((item) => [item.key, item]));
+  const quick = locations
+    .filter((location) => location.isQuick)
+    .map(
+      (location) =>
+        occupiedMap.get(location.key) ?? {
+          key: location.key,
+          label: location.label,
+          token: location.colorToken,
+          count: 0,
+        },
+    );
+  const quickKeys = new Set(quick.map((item) => item.key));
+  return [...quick, ...occupied.filter((item) => !quickKeys.has(item.key))];
+}
+
 export type OverviewLocationMetric = {
   key: string;
   locationKeys: string[];
@@ -212,4 +231,51 @@ export function overviewLocationMetrics(
   return [...groupMetrics, ...locationMetrics, ...customMetrics].sort(
     (a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label, "ru"),
   );
+}
+
+/** Command strip: every isQuick location, then other occupied groups/places. */
+export function commandStripLocationMetrics(
+  people: Person[],
+  locations: LocationOption[],
+  groups: LocationGroup[],
+): OverviewLocationMetric[] {
+  const counts = new Map<string, number>();
+  for (const person of people) counts.set(person.location, (counts.get(person.location) ?? 0) + 1);
+
+  const metrics = overviewLocationMetrics(people, locations, groups);
+  const standalone = new Map<string, OverviewLocationMetric>();
+  for (const item of metrics) {
+    if (item.kind === "location" && item.locationKeys.length === 1) {
+      standalone.set(item.locationKeys[0], item);
+    }
+  }
+
+  const quickItems = locations
+    .filter((location) => location.isQuick)
+    .map(
+      (location) =>
+        standalone.get(location.key) ?? {
+          key: `location:${location.key}`,
+          locationKeys: [location.key],
+          label: location.label,
+          token: location.colorToken,
+          count: counts.get(location.key) ?? 0,
+          sortOrder: location.sortOrder,
+          kind: "location" as const,
+        },
+    )
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label, "ru"));
+
+  const quickKeys = new Set(quickItems.flatMap((item) => item.locationKeys));
+  const rest = metrics
+    .filter((item) => item.count > 0)
+    .filter((item) => !item.locationKeys.every((key) => quickKeys.has(key)))
+    .sort(
+      (a, b) =>
+        b.count - a.count ||
+        a.sortOrder - b.sortOrder ||
+        a.label.localeCompare(b.label, "ru"),
+    );
+
+  return [...quickItems, ...rest];
 }

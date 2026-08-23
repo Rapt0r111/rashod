@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowCounterClockwiseIcon, XIcon } from "@phosphor-icons/react";
 import { SearchSortControl, type SearchSortOption } from "@/components/search-sort-control";
 import { useDialogFocus } from "@/components/use-dialog-focus";
@@ -19,6 +19,97 @@ import { filterListItems, sortListItems, type ListSortState } from "@/components
 const historySortOptions: SearchSortOption[] = [
   { key: "alpha", label: "А–Я" },
 ];
+
+function LocationPicker({
+  locations,
+  selectedKey,
+  inputId,
+  onPick,
+}: {
+  locations: LocationOption[];
+  selectedKey?: string;
+  inputId: string;
+  onPick: (value: string) => void;
+}) {
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customValue, setCustomValue] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const trimmed = customValue.trim();
+  const canSubmit = trimmed.length > 0 && trimmed !== selectedKey;
+
+  useEffect(() => {
+    if (customOpen) inputRef.current?.focus();
+  }, [customOpen]);
+
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-2 max-[720px]:grid-cols-1">
+        {locations.map((location) => (
+          <button
+            type="button"
+            key={location.id}
+            className={cx(
+              "flex min-h-10.5 min-w-0 items-center gap-2 overflow-hidden rounded-[13px] border px-3 text-left text-text-primary",
+              selectedKey === location.key ? toneClasses(location.colorToken).border : "border-line",
+              selectedKey === location.key ? toneClasses(location.colorToken).soft : "bg-white/4",
+            )}
+            disabled={selectedKey === location.key}
+            onClick={() => onPick(location.key)}
+          >
+            <span
+              className={cx("h-2 w-2 shrink-0 rounded-full", toneClasses(location.colorToken).bg)}
+            />
+            {location.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          className={cx(
+            "flex min-h-10.5 min-w-0 items-center gap-2 overflow-hidden rounded-[13px] border px-3 text-left font-bold text-text-primary",
+            customOpen ? "border-accent bg-accent-soft" : "border-line bg-white/4",
+          )}
+          aria-expanded={customOpen}
+          aria-controls={inputId}
+          onClick={() => setCustomOpen(true)}
+        >
+          Другое
+        </button>
+      </div>
+      {customOpen && (
+        <form
+          className="mt-2 flex min-w-0 items-center gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!canSubmit) return;
+            onPick(trimmed);
+          }}
+        >
+          <input
+            id={inputId}
+            ref={inputRef}
+            className="min-h-10.5 min-w-0 flex-1 rounded-[13px] border border-line bg-white/4 px-3 text-sm font-semibold text-text-primary outline-none transition placeholder:text-text-muted focus:border-cyan focus:ring-2 focus:ring-cyan/15"
+            value={customValue}
+            onChange={(event) => setCustomValue(event.target.value)}
+            placeholder="Название места"
+            aria-label="Другое место"
+            maxLength={120}
+            autoComplete="off"
+          />
+          <button
+            type="submit"
+            className="min-h-10.5 shrink-0 rounded-[13px] border border-accent-line bg-accent-soft px-3 font-bold text-text-primary disabled:opacity-55"
+            disabled={!canSubmit}
+          >
+            Перевести
+          </button>
+        </form>
+      )}
+      <p className="mt-3 mb-0 text-xs text-text-muted">
+        Временное место не попадёт в справочник.
+      </p>
+    </>
+  );
+}
 
 export function LocationSheet({
   person,
@@ -55,29 +146,12 @@ export function LocationSheet({
           </div>
         </div>
         <h3 className="my-4.5 mb-2.5 text-[13px] text-text-secondary">Куда перевести</h3>
-        <div className="grid grid-cols-2 gap-2 max-[720px]:grid-cols-1">
-          {locations.map((location) => (
-            <button
-              type="button"
-              key={location.id}
-              className={cx(
-                "flex min-h-10.5 min-w-0 items-center gap-2 overflow-hidden rounded-[13px] border px-3 text-left text-text-primary",
-                person.location === location.key ? toneClasses(location.colorToken).border : "border-line",
-                person.location === location.key ? toneClasses(location.colorToken).soft : "bg-white/4",
-              )}
-              disabled={person.location === location.key}
-              onClick={() => onPick(person, location.key)}
-            >
-              <span
-                className={cx("h-2 w-2 shrink-0 rounded-full", toneClasses(location.colorToken).bg)}
-              />
-              {location.label}
-            </button>
-          ))}
-        </div>
-        <p className="mt-3 mb-0 text-xs text-text-muted">
-          Только места из справочника. Новые точки добавляет администратор.
-        </p>
+        <LocationPicker
+          locations={locations}
+          selectedKey={person.location}
+          inputId="custom-location-input"
+          onPick={(value) => onPick(person, value)}
+        />
         <button className="mt-3 min-h-10.5 w-full rounded-xl border border-accent-line bg-accent-soft px-3.5 font-bold text-text-primary" type="button" onClick={onClose}>
           Закрыть
         </button>
@@ -115,21 +189,13 @@ export function BatchLocationSheet({
         <h2 className="m-0 text-[19px]" id="batch-location-title">
           Перевести {count} чел.
         </h2>
-        <p className="mt-1 mb-0 text-sm text-text-muted">Выберите место из справочника</p>
-        <div className="mt-4 grid grid-cols-2 gap-2 max-[720px]:grid-cols-1">
-          {locations.map((location) => (
-            <button
-              type="button"
-              key={location.id}
-              className={cx(
-                "flex min-h-10.5 min-w-0 items-center gap-2 overflow-hidden rounded-[13px] border border-line bg-white/4 px-3 text-left text-text-primary",
-              )}
-              onClick={() => onPick(location.key)}
-            >
-              <span className={cx("h-2 w-2 shrink-0 rounded-full", toneClasses(location.colorToken).bg)} />
-              {location.label}
-            </button>
-          ))}
+        <p className="mt-1 mb-0 text-sm text-text-muted">Выберите место или укажите своё</p>
+        <div className="mt-4">
+          <LocationPicker
+            locations={locations}
+            inputId="batch-custom-location-input"
+            onPick={onPick}
+          />
         </div>
         <button className="mt-3 min-h-10.5 w-full rounded-xl border border-accent-line bg-accent-soft px-3.5 font-bold text-text-primary" type="button" onClick={onClose}>
           Отмена

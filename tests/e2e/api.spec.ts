@@ -66,17 +66,34 @@ test("mutation boundaries reject CSRF, media type and malformed JSON", async ({ 
   await admin.dispose();
 });
 
-test("unknown location is a 404 and cannot mutate a person", async ({ baseURL }) => {
+test("typed other location is stored without creating a catalog row", async ({ baseURL }) => {
   const admin = await apiAs(baseURL!, "admin");
   const before = await (await admin.get("/api/snapshot")).json();
   const person = before.people[0] as { id: string; location: string };
-  const response = await admin.post("/api/location-change", {
-    data: { personId: person.id, to: "missing-e2e-location" },
+  const catalogCount = (before.locations as unknown[]).length;
+  const typed = `Другое e2e ${Date.now()}`;
+
+  const empty = await admin.post("/api/location-change", {
+    data: { personId: person.id, to: "   " },
   });
-  expect(response.status()).toBe(404);
-  await expect(response.json()).resolves.toEqual({ error: "LOCATION_NOT_FOUND" });
-  const after = await (await admin.get("/api/snapshot")).json();
-  expect(after.people.find((item: { id: string }) => item.id === person.id).location).toBe(person.location);
+  expect(empty.status()).toBe(400);
+
+  const response = await admin.post("/api/location-change", {
+    data: { personId: person.id, to: typed },
+  });
+  expect(response.status()).toBe(200);
+  const after = await response.json();
+  expect(after.people.find((item: { id: string }) => item.id === person.id).location).toBe(typed);
+  expect(after.locations).toHaveLength(catalogCount);
+  expect(
+    after.locations.some(
+      (item: { key: string; label: string }) => item.key === typed || item.label === typed,
+    ),
+  ).toBe(false);
+
+  await admin.post("/api/location-change", {
+    data: { personId: person.id, to: person.location },
+  });
   await admin.dispose();
 });
 

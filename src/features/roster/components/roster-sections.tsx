@@ -9,10 +9,10 @@ import {
   peopleForPlatoon,
   selectedFilterKeys,
 } from "../utils";
-import { locationsAndCustom, presentLocationKeys } from "../roster-metrics";
+import { locationsAndCustom, locationsAndQuick, presentLocationKeys } from "../roster-metrics";
 import { sortListItems } from "@/components/list-utils";
 import type { SelectionProps } from "./selection-types";
-import { RosterRow, RosterTable } from "./person-views";
+import { RosterColumnToggles, RosterRow, RosterTable } from "./person-views";
 import {
   EmptyState,
   FilterPills,
@@ -151,7 +151,7 @@ export function AllPlatoons({
     [dispatch],
   );
   const availableLocations = useMemo(
-    () => locationsAndCustom(people, locations),
+    () => locationsAndQuick(people, locations),
     [people, locations],
   );
   const availableConscriptionNumbers = useMemo(() => conscriptionOptions(people), [people]);
@@ -168,6 +168,13 @@ export function AllPlatoons({
       <SectionHeader
         title="Все взвода"
         subtitle="Полный список, быстрые кнопки меняют место одним нажатием"
+        action={
+          <RosterColumnToggles
+            showRank={state.ui.showRankColumn}
+            showPlatoon={state.ui.showPlatoonColumn}
+            onToggle={(column) => dispatch({ type: "toggleRosterColumn", column })}
+          />
+        }
       />
       <CollapsibleFilter
         activeCount={
@@ -225,7 +232,10 @@ export function AllPlatoons({
               {inRota}/{group.length} в роте
             </b>
           </div>
-          <RosterTable>
+          <RosterTable
+            showRank={state.ui.showRankColumn}
+            showContext={state.ui.showPlatoonColumn}
+          >
             {group.map((person) => (
               <RosterRow
                 key={person.id}
@@ -254,6 +264,7 @@ export function PlatoonSection({
   platoon,
   people,
   locations,
+  onLocation,
   canWrite,
   dispatch,
   selection,
@@ -347,6 +358,13 @@ export function PlatoonSection({
       <SectionHeader
         title={platoon.label}
         subtitle={`${platoonPeople.length} человек по списку`}
+        action={
+          <RosterColumnToggles
+            showRank={state.ui.showRankColumn}
+            showPlatoon={state.ui.showPlatoonColumn}
+            onToggle={(column) => dispatch({ type: "toggleRosterColumn", column })}
+          />
+        }
       />
       <CollapsibleFilter
         activeCount={
@@ -380,7 +398,10 @@ export function PlatoonSection({
           onPick={handleConscriptionFilter}
         />
       </CollapsibleFilter>
-      <RosterTable>
+      <RosterTable
+        showRank={state.ui.showRankColumn}
+        showContext={state.ui.showPlatoonColumn}
+      >
         {filtered.map((person) => (
           <RosterRow
             key={person.id}

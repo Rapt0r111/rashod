@@ -4,7 +4,7 @@ import type { LocationOption, Person, Platoon } from "../types";
 import type { Action, State } from "../state";
 import { filterPeople } from "../utils";
 import { sortListItems } from "@/components/list-utils";
-import { RosterRow, RosterTable } from "./person-views";
+import { RosterColumnToggles, RosterRow, RosterTable } from "./person-views";
 import { Overview } from "./overview-section";
 import {
   AllPlatoons,
@@ -144,9 +144,19 @@ function SearchResults({
       <SectionHeader
         title="Результаты поиска"
         subtitle={`${results.length} ${results.length === 1 ? "человек" : "человек найдено"} по запросу «${query}»`}
+        action={
+          <RosterColumnToggles
+            showRank={state.ui.showRankColumn}
+            showPlatoon={state.ui.showPlatoonColumn}
+            onToggle={(column) => dispatch({ type: "toggleRosterColumn", column })}
+          />
+        }
       />
       {results.length > 0 ? (
-        <RosterTable>
+        <RosterTable
+          showRank={state.ui.showRankColumn}
+          showContext={state.ui.showPlatoonColumn}
+        >
           {results.map((person) => (
             <RosterRow
               key={person.id}

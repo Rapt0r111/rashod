@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  commandStripLocationMetrics,
+  locationsAndCustom,
+  locationsAndQuick,
   overviewLocationMetrics,
   platoonLocationMatrix,
   presentLocationKeys,
@@ -160,5 +163,123 @@ describe("platoon location matrix", () => {
       naryad: 1,
     });
     expect(matrix.columnTotals.rota).toBe(2);
+  });
+
+  it("includes a typed non-catalog place while occupied and drops it when empty", () => {
+    const typed = "Полевой госпиталь";
+    const platoons: Platoon[] = [
+      { id: "p1", key: "vz1", label: "1 взвод", sortOrder: 10, isSystem: true },
+    ];
+    const occupied = [ { ...person("1", typed), platoonId: "p1" } ];
+    const matrix = platoonLocationMatrix(occupied, platoons, locations);
+    expect(matrix.locationKeys).toContain(typed);
+    expect(matrix.columnTotals[typed]).toBe(1);
+    expect(locations.some((location) => location.key === typed)).toBe(false);
+
+    const vacated = [ { ...person("1", "rota"), platoonId: "p1" } ];
+    expect(platoonLocationMatrix(vacated, platoons, locations).locationKeys).not.toContain(typed);
+  });
+});
+
+describe("typed custom locations", () => {
+  it("counts and labels a occupied non-catalog place, then drops it when empty", () => {
+    const typed = "Полевой госпиталь";
+    const occupied = [person("1", typed), person("2", "rota")];
+    const distribution = locationsAndCustom(occupied, locations);
+    expect(distribution.find((item) => item.key === typed)).toEqual({
+      key: typed,
+      label: typed,
+      token: "neutral",
+      count: 1,
+    });
+    expect(locations.some((location) => location.key === typed || location.label === typed)).toBe(false);
+
+    const metrics = overviewLocationMetrics(occupied, locations, []);
+    const custom = metrics.find((item) => item.kind === "custom" && item.key === `custom:${typed}`);
+    expect(custom?.label).toBe(typed);
+    expect(custom?.count).toBe(1);
+    expect(metrics.find((item) => item.key === "location:rota")?.count).toBe(1);
+
+    const present = rosterBalance(occupied, presentLocationKeys(locations));
+    expect(present.present).toBe(1);
+    expect(present.away).toBe(1);
+
+    const vacated = [person("1", "rota"), person("2", "rota")];
+    expect(locationsAndCustom(vacated, locations).some((item) => item.key === typed)).toBe(false);
+    expect(
+      overviewLocationMetrics(vacated, locations, []).some((item) => item.key === `custom:${typed}`),
+    ).toBe(false);
+  });
+});
+
+describe("quick locations", () => {
+  const catalog: LocationOption[] = [
+    ...locations,
+    {
+      id: "otpusk",
+      key: "otpusk",
+      label: "Отпуск",
+      colorToken: "neutral",
+      isQuick: false,
+      quickCode: null,
+      isSystem: true,
+      countsAsPresent: false,
+      sortOrder: 80,
+    },
+  ];
+
+  it("keeps empty isQuick places in the All Platoons filter", () => {
+    const items = locationsAndQuick([person("1", "rota")], catalog);
+    expect(items.map((item) => item.key)).toEqual(["rota", "naryad", "technopark"]);
+    expect(items.find((item) => item.key === "naryad")?.count).toBe(0);
+    expect(items.some((item) => item.key === "otpusk")).toBe(false);
+  });
+
+  it("keeps occupied non-quick and custom places after the quick set", () => {
+    const typed = "Полевой госпиталь";
+    const items = locationsAndQuick(
+      [person("1", "rota"), person("2", "otpusk"), person("3", typed)],
+      catalog,
+    );
+    expect(items.map((item) => item.key)).toEqual([
+      "rota",
+      "naryad",
+      "technopark",
+      "otpusk",
+      typed,
+    ]);
+  });
+
+  it("always shows isQuick locations on the command strip, even at zero", () => {
+    const strip = commandStripLocationMetrics([person("1", "rota")], catalog, []);
+    expect(strip.map((item) => item.locationKeys[0])).toEqual(["rota", "naryad", "technopark"]);
+    expect(strip.find((item) => item.locationKeys[0] === "technopark")?.count).toBe(0);
+  });
+
+  it("still lists an occupied non-quick place after the quick chips", () => {
+    const strip = commandStripLocationMetrics(
+      [person("1", "rota"), person("2", "otpusk")],
+      catalog,
+      [],
+    );
+    expect(strip.map((item) => item.locationKeys[0])).toEqual([
+      "rota",
+      "naryad",
+      "technopark",
+      "otpusk",
+    ]);
+  });
+
+  it("keeps isQuick locations as their own chips even inside a group", () => {
+    const strip = commandStripLocationMetrics(
+      [person("1", "rota")],
+      catalog,
+      [group("1", "Рабочие", ["rota", "naryad"])],
+    );
+    expect(strip.map((item) => item.locationKeys.join("+"))).toEqual([
+      "rota",
+      "naryad",
+      "technopark",
+    ]);
   });
 });

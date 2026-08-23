@@ -2,7 +2,7 @@ import { memo, useMemo } from "react";
 import type { ListSortState } from "@/components/list-utils";
 import { SearchSortControl } from "@/components/search-sort-control";
 import type { LocationGroup, LocationOption, Person } from "../types";
-import { overviewLocationMetrics } from "../roster-metrics";
+import { commandStripLocationMetrics } from "../roster-metrics";
 import { cx } from "../utils";
 
 function sameKeys(left: string[] | null | undefined, right: string[]) {
@@ -40,15 +40,7 @@ export const OperatorBar = memo(function OperatorBar({
   onResetFilters: () => void;
 }) {
   const distribution = useMemo(
-    () =>
-      overviewLocationMetrics(people, locations, locationGroups)
-        .filter((item) => item.count > 0)
-        .sort(
-          (a, b) =>
-            b.count - a.count ||
-            a.sortOrder - b.sortOrder ||
-            a.label.localeCompare(b.label, "ru"),
-        ),
+    () => commandStripLocationMetrics(people, locations, locationGroups),
     [people, locations, locationGroups],
   );
   const totalSelected = !selectedLocationKeys?.length;

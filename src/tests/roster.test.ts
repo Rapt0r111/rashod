@@ -57,6 +57,24 @@ describe("filtering", () => {
     ).toEqual(["b"]);
   });
 
+  it("filters by a typed non-catalog location key", () => {
+    const typed = "Полевой госпиталь";
+    const people: Person[] = [
+      { id: "a", platoonId: "p1", rank: "r", name: "a", conscriptionNumber: null, location: "rota", sortOrder: 1, createdAt: 1, updatedAt: 1 },
+      { id: "b", platoonId: "p1", rank: "r", name: "b", conscriptionNumber: null, location: typed, sortOrder: 2, createdAt: 1, updatedAt: 1 },
+    ];
+    expect(
+      filterPeopleByRosterFilters(people, {
+        platoonFilter: null,
+        platoonFilterKeys: null,
+        locationFilter: typed,
+        locationFilterKeys: null,
+        conscriptionFilter: null,
+        conscriptionFilterKeys: null,
+      }).map((person) => person.id),
+    ).toEqual(["b"]);
+  });
+
   it("searches by rank and name without case sensitivity", () => {
     const seed = createSeedData();
     expect(filterPeople(seed.people, "капитан")).toHaveLength(1);
@@ -103,6 +121,19 @@ describe("csv export", () => {
     expect(csv).toContain(';"";"сержант";');
     expect(csv).toContain('"Рота"');
     expect(locationLabel("rota", seed.locations)).toBe("Рота");
+  });
+
+  it("exports a typed non-catalog place under the typed name", () => {
+    const seed = createSeedData();
+    const typed = "Полевой госпиталь";
+    expect(locationLabel(typed, seed.locations)).toBe(typed);
+    expect(seed.locations.some((location) => location.key === typed)).toBe(false);
+    const csv = buildRosterCsv(
+      [{ ...seed.people[0], location: typed }],
+      seed.platoons,
+      seed.locations,
+    );
+    expect(csv).toContain(`"${typed}"`);
   });
 
   it("exports the conscription number column", () => {

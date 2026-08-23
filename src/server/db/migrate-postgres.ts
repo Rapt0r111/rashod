@@ -18,6 +18,7 @@ export const POSTGRES_MIGRATIONS = [
   "0012_zgt_phones_and_storage_items.sql",
   "0013_phones_person_set_null.sql",
   "0014_location_foreign_keys.sql",
+  "0015_people_location_no_catalog_fk.sql",
 ] as const;
 
 type MigrationName = (typeof POSTGRES_MIGRATIONS)[number];
@@ -192,7 +193,6 @@ const REQUIRED_CONSTRAINTS = [
   "chk_storage_items_type",
   "chk_storage_items_status",
   "phones_person_id_fkey",
-  "people_location_fkey",
   "location_group_members_location_fkey",
 ] as const;
 const REQUIRED_INDEXES = [

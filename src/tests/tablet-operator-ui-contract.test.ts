@@ -13,6 +13,14 @@ describe("Tablet operator workflow contract", () => {
     expect(bar).toContain('placeholder="Найти человека по ФИО, званию или номеру призыва"');
     expect(bar).toContain("min-h-11");
     expect(bar).toContain('role="alert"');
+    expect(bar).toContain("commandStripLocationMetrics");
+  });
+
+  it("lists every isQuick location in All Platoons filters", () => {
+    const sections = read("src/features/roster/components/roster-sections.tsx");
+
+    expect(sections).toContain("locationsAndQuick");
+    expect(sections).toContain('title="Все взвода"');
   });
 
   it("switches to flat, cross-platoon search results", () => {
@@ -61,6 +69,35 @@ describe("Tablet operator workflow contract", () => {
     const people = read("src/features/roster/components/person-views.tsx");
 
     expect(people).not.toMatch(/wrap-anywhere\s+wrap-break-word|wrap-break-word\s+wrap-anywhere/);
+  });
+
+  it("keeps All Platoons roster rows compact and one-line by default", () => {
+    const people = read("src/features/roster/components/person-views.tsx");
+    const sections = read("src/features/roster/components/roster-sections.tsx");
+
+    expect(people).not.toContain("min-w-[720px]");
+    expect(people).not.toContain("wrap-anywhere");
+    expect(people).toContain("wrap-break-word");
+    expect(people).toContain("flex-nowrap");
+    expect(people).toContain("min-[561px]:size-9");
+    expect(people).toContain("showRank?: boolean");
+    expect(people).toContain("showContext?: boolean");
+    expect(people).toContain("RosterColumnToggles");
+    expect(sections).toContain("showRankColumn");
+    expect(sections).toContain("showPlatoonColumn");
+    expect(sections).toContain('title="Все взвода"');
+  });
+
+  it("lets the operator type a temporary Другое place in assignment sheets", () => {
+    const dialogs = read("src/features/roster/components/dialogs.tsx");
+    const selection = read("src/features/roster/components/selection-bar.tsx");
+
+    expect(dialogs).toMatch(/>\s*Другое\s*</);
+    expect(dialogs).toContain('placeholder="Название места"');
+    expect(dialogs).toContain('aria-label="Другое место"');
+    expect(dialogs).toContain("onPick(trimmed)");
+    expect(dialogs).not.toContain("Только места из справочника");
+    expect(selection).toContain("Другое место…");
   });
 
   it("allows the shared search control to be reused without either half", () => {

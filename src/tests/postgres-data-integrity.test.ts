@@ -29,6 +29,7 @@ describe("PostgreSQL data integrity normalization", () => {
         "0012_zgt_phones_and_storage_items.sql",
         "0013_phones_person_set_null.sql",
         "0014_location_foreign_keys.sql",
+        "0015_people_location_no_catalog_fk.sql",
       ]),
     );
     const idx10 = POSTGRES_MIGRATIONS.indexOf("0010_group_overlap_policy.sql");
@@ -36,10 +37,12 @@ describe("PostgreSQL data integrity normalization", () => {
     const idx12 = POSTGRES_MIGRATIONS.indexOf("0012_zgt_phones_and_storage_items.sql");
     const idx13 = POSTGRES_MIGRATIONS.indexOf("0013_phones_person_set_null.sql");
     const idx14 = POSTGRES_MIGRATIONS.indexOf("0014_location_foreign_keys.sql");
+    const idx15 = POSTGRES_MIGRATIONS.indexOf("0015_people_location_no_catalog_fk.sql");
     expect(idx11).toBeGreaterThan(idx10);
     expect(idx12).toBeGreaterThan(idx11);
     expect(idx13).toBeGreaterThan(idx12);
     expect(idx14).toBeGreaterThan(idx13);
+    expect(idx15).toBeGreaterThan(idx14);
     expect(migrationPath("/repo", "0010_group_overlap_policy.sql")).toContain("drizzle");
   });
 
@@ -77,6 +80,13 @@ describe("PostgreSQL data integrity normalization", () => {
     );
     expect(locationKeys).toContain("people_location_fkey");
     expect(locationKeys).toContain("location_group_members_location_fkey");
+    const dropPeopleLocationFk = readFileSync(
+      resolve(process.cwd(), "drizzle/0015_people_location_no_catalog_fk.sql"),
+      "utf8",
+    );
+    expect(dropPeopleLocationFk).toContain("DROP CONSTRAINT IF EXISTS people_location_fkey");
+    expect(rosterRepositorySource.match(/LOCATION_NOT_FOUND/g)).toEqual(["LOCATION_NOT_FOUND"]);
+    expect(rosterRepositorySource).toContain("function assignedLocation(to: string)");
   });
 
   it("hard-blocks DELETE of system locations and platoons", () => {

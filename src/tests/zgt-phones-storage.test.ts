@@ -13,7 +13,8 @@ describe("zgt phones and storage items", () => {
     expect(POSTGRES_MIGRATIONS).toContain("0012_zgt_phones_and_storage_items.sql");
     expect(POSTGRES_MIGRATIONS).toContain("0013_phones_person_set_null.sql");
     expect(POSTGRES_MIGRATIONS).toContain("0014_location_foreign_keys.sql");
-    expect(POSTGRES_MIGRATIONS.at(-1)).toBe("0014_location_foreign_keys.sql");
+    expect(POSTGRES_MIGRATIONS).toContain("0015_people_location_no_catalog_fk.sql");
+    expect(POSTGRES_MIGRATIONS.at(-1)).toBe("0015_people_location_no_catalog_fk.sql");
   });
 
   it("validates phone form with people owner", () => {

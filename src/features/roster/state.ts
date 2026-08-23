@@ -16,6 +16,8 @@ export type UiState = {
   hasUnseenHistory: boolean;
   isAdminOpen: boolean;
   sort: ListSortState;
+  showRankColumn: boolean;
+  showPlatoonColumn: boolean;
 };
 
 export type State = Snapshot & { ui: UiState; flashPersonId: string | null };
@@ -42,7 +44,8 @@ export type Action =
   | { type: "history"; open: boolean }
   | { type: "admin"; open: boolean }
   | { type: "flash"; personId: string | null }
-  | { type: "sort"; value: ListSortState };
+  | { type: "sort"; value: ListSortState }
+  | { type: "toggleRosterColumn"; column: "rank" | "platoon" };
 
 export const initialUi: UiState = {
   activeSection: "all",
@@ -59,6 +62,8 @@ export const initialUi: UiState = {
   hasUnseenHistory: false,
   isAdminOpen: false,
   sort: { key: "alpha", direction: "asc" },
+  showRankColumn: true,
+  showPlatoonColumn: false,
 };
 
 export function reducer(state: State, action: Action): State {
@@ -231,6 +236,19 @@ export function reducer(state: State, action: Action): State {
       return { ...state, flashPersonId: action.personId };
     case "sort":
       return { ...state, ui: { ...state.ui, sort: action.value } };
+    case "toggleRosterColumn":
+      return {
+        ...state,
+        ui: {
+          ...state.ui,
+          showRankColumn:
+            action.column === "rank" ? !state.ui.showRankColumn : state.ui.showRankColumn,
+          showPlatoonColumn:
+            action.column === "platoon"
+              ? !state.ui.showPlatoonColumn
+              : state.ui.showPlatoonColumn,
+        },
+      };
   }
 }
 

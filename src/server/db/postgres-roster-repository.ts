@@ -56,14 +56,18 @@ export async function getPostgresSnapshot(): Promise<Snapshot> {
   };
 }
 
-export async function changePostgresPersonLocation(personId: string, to: string, writeLog = true) {
+function assignedLocation(to: string) {
   const location = to.trim();
   if (!location) throw new Error("LOCATION_REQUIRED");
+  return location;
+}
+
+export async function changePostgresPersonLocation(personId: string, to: string, writeLog = true) {
+  const location = assignedLocation(to);
   return inPostgresTransaction(async (transaction) => {
     const rows = await transaction<DbPerson[]>`SELECT id, platoon_id AS "platoonId", rank, name, conscription_number AS "conscriptionNumber", location, sort_order AS "sortOrder", created_at, updated_at FROM people WHERE id = ${personId} FOR UPDATE`;
     const current = rows[0];
     if (!current) throw new Error("PERSON_NOT_FOUND");
-    if (!(await transaction`SELECT 1 FROM locations WHERE key = ${location}`).length) throw new Error("LOCATION_NOT_FOUND");
     const movement = locationChangeLog(current, location);
     if (!movement) return { person: person(current), log: null as LogEntry | null };
     const updatedRows = await transaction<DbPerson[]>`UPDATE people SET location = ${location}, updated_at = now() WHERE id = ${personId} RETURNING id, platoon_id AS "platoonId", rank, name, conscription_number AS "conscriptionNumber", location, sort_order AS "sortOrder", created_at, updated_at`;
@@ -80,8 +84,7 @@ export async function changePostgresPersonLocation(personId: string, to: string,
 
 /** Move many people to one location in a single transaction (one SSE burst). */
 export async function changePostgresPeopleLocations(personIds: string[], to: string) {
-  const location = to.trim();
-  if (!location) throw new Error("LOCATION_REQUIRED");
+  const location = assignedLocation(to);
   const ids = [...new Set(personIds.map((id) => id.trim()).filter(Boolean))];
   if (!ids.length) {
     return { changed: [] as Array<{ personId: string; name: string; from: string; to: string }> };
@@ -89,9 +92,6 @@ export async function changePostgresPeopleLocations(personIds: string[], to: str
 
   return inPostgresTransaction(async (transaction) => {
     const sql = pg();
-    if (!(await transaction`SELECT 1 FROM locations WHERE key = ${location}`).length) {
-      throw new Error("LOCATION_NOT_FOUND");
-    }
     const rows = await transaction<DbPerson[]>`
       SELECT id, platoon_id AS "platoonId", rank, name, conscription_number AS "conscriptionNumber", location, sort_order AS "sortOrder", created_at, updated_at
       FROM people WHERE id = ANY(${sql.array(ids)}) FOR UPDATE
@@ -134,16 +134,16 @@ export async function changePostgresPeopleLocations(personIds: string[], to: str
 export async function undoPostgresLocations(changes: Array<{ personId: string; location: string }>) {
   await inPostgresTransaction(async (transaction) => {
     for (const change of changes) {
+      const location = assignedLocation(change.location);
       const [current] = await transaction<DbPerson[]>`
         SELECT id, platoon_id AS "platoonId", rank, name, conscription_number AS "conscriptionNumber", location, sort_order AS "sortOrder", created_at, updated_at
         FROM people WHERE id = ${change.personId} FOR UPDATE
       `;
-      if (!current || current.location === change.location) continue;
-      if (!(await transaction`SELECT 1 FROM locations WHERE key = ${change.location}`).length) throw new Error("LOCATION_NOT_FOUND");
-      await transaction`UPDATE people SET location = ${change.location}, updated_at = now() WHERE id = ${change.personId}`;
+      if (!current || current.location === location) continue;
+      await transaction`UPDATE people SET location = ${location}, updated_at = now() WHERE id = ${change.personId}`;
       await transaction`
         INSERT INTO movement_logs (id, person_id, name, from_value, to_value)
-        VALUES (${randomUUID()}, ${change.personId}, ${current.name}, ${current.location}, ${change.location})
+        VALUES (${randomUUID()}, ${change.personId}, ${current.name}, ${current.location}, ${location})
       `;
     }
     await transaction`DELETE FROM movement_logs WHERE id IN (SELECT id FROM movement_logs ORDER BY occurred_at DESC OFFSET ${MAX_LOG_ENTRIES})`;

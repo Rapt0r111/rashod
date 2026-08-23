@@ -96,4 +96,17 @@ describe("roster navigation filters", () => {
     expect(withConscription.ui.conscriptionFilterKeys).toEqual(["12", "13"]);
     expect(withConscription.ui.conscriptionFilter).toBeNull();
   });
+
+  it("toggles rank and platoon columns without resetting them on section change", () => {
+    const hiddenRank = reducer(testState(), { type: "toggleRosterColumn", column: "rank" });
+    const shownPlatoon = reducer(hiddenRank, { type: "toggleRosterColumn", column: "platoon" });
+    const changedSection = reducer(shownPlatoon, { type: "section", key: "vz1" });
+
+    expect(initialUi.showRankColumn).toBe(true);
+    expect(initialUi.showPlatoonColumn).toBe(false);
+    expect(hiddenRank.ui.showRankColumn).toBe(false);
+    expect(shownPlatoon.ui.showPlatoonColumn).toBe(true);
+    expect(changedSection.ui.showRankColumn).toBe(false);
+    expect(changedSection.ui.showPlatoonColumn).toBe(true);
+  });
 });
